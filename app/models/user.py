@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy import Boolean, DateTime, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -21,6 +21,16 @@ class Apprenant(Base):
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    # --- Verification / confiance ---
+    # Un apprenant n'est propose dans le moteur de matching (recherche de
+    # prestataires + assistant SITA) que s'il est verifie manuellement par un
+    # admin (identite / serieux) ET que son score de confiance calcule est au
+    # dessus du seuil (voir app.services.trust_score). C'est le "blocage
+    # automatique" : aucun contournement possible depuis le matching public.
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reference_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="apprenant")
     quiz_attempts: Mapped[list["QuizAttempt"]] = relationship(back_populates="apprenant")

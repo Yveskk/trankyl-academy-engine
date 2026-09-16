@@ -83,6 +83,13 @@ def build_context(db: Session) -> str:
         })
 
     # --- Prestataires certifies ---
+    # Blocage automatique : SITA ne doit JAMAIS suggerer un apprenant qui
+    # n'est pas verifie par un admin ET au-dessus du seuil de confiance
+    # (voir app.services.trust_score.is_matching_eligible). C'est verifie ici
+    # pour chaque candidat, pas seulement cote frontend.
+    from app.models.trust import TrustScore
+    from app.services.trust_score import is_matching_eligible
+
     certifications = db.query(Certification).all()
     prestataires_map: dict[int, dict] = {}
     for cert in certifications:
@@ -90,13 +97,18 @@ def build_context(db: Session) -> str:
             apprenant = db.get(Apprenant, cert.apprenant_id)
             if not apprenant:
                 continue
+            trust = db.query(TrustScore).filter(TrustScore.apprenant_id == apprenant.id).first()
+            if not is_matching_eligible(apprenant, trust):
+                continue
             prestataires_map[cert.apprenant_id] = {
                 "id": apprenant.id,
                 "nom": f"{apprenant.firstname} {apprenant.lastname}",
                 "certifications": [],
                 "modules_completes": 0,
+                "score_confiance": trust.score_pct,
             }
-        prestataires_map[cert.apprenant_id]["certifications"].append(cert.code)
+        if cert.apprenant_id in prestataires_map:
+            prestataires_map[cert.apprenant_id]["certifications"].append(cert.code)
 
     # Ajouter le nombre de modules completes
     for pid in prestataires_map:

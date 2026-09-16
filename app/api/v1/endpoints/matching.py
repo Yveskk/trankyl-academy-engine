@@ -1,10 +1,13 @@
 """Moteur de matching + messagerie + gestion apprenants (admin)."""
-from fastapi import APIRouter, Depends, HTTPException
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import get_current_admin, get_current_apprenant
+from app.api.deps import get_current_admin, get_current_apprenant, get_optional_admin
+from app.core.rate_limit import limiter
 from app.db.session import get_db
 from app.models.certification import Certification
 from app.models.curriculum import Module
@@ -12,7 +15,8 @@ from app.models.matching import MatchingRequest, Match, Message
 from app.models.chat_history import ChatSession, ChatMessageRecord
 from app.models.progress import Enrollment
 from app.models.taxonomy import Competence, Niveau, Metier
-from app.models.user import Apprenant
+from app.models.trust import TrustScore
+from app.models.user import AdminUser, Apprenant
 from app.schemas.matching import (
     ApprenantDetailOut,
     ApprenantOut,
@@ -26,8 +30,12 @@ from app.schemas.matching import (
     MessageCreate,
     MessageOut,
     PrestataireMatchOut,
+    TrustScoreOut,
+    VerificationUpdate,
 )
 from app.services.ai_matching import chat_with_ai
+from app.services.matching_score import compute_match_score
+from app.services.trust_score import compute_trust_score, is_matching_eligible
 
 router = APIRouter()
 
@@ -81,22 +89,21 @@ def get_matches(
     return db.query(Match).filter(Match.request_id == request_id).order_by(Match.score.desc()).all()
 
 
-@router.get("/prestataires")
+@router.get("/prestataires", response_model=list[PrestataireMatchOut])
 def search_prestataires(
     metier_code: str | None = None,
     db: Session = Depends(get_db),
 ):
-    """Recherche publique de prestataires certifies (pour le moteur de matching)."""
-    # Trouver tous les apprenants qui ont au moins une certification
-    certified = (
-        db.query(Certification)
-        .all()
-    )
+    """Recherche publique de prestataires certifies (pour le moteur de
+    matching). Blocage automatique : un apprenant non verifie, ou sans score
+    de confiance calcule, ou sous le seuil, n'apparait jamais ici — meme
+    s'il a des certifications. Si `metier_code` est fourni, chaque candidat
+    recoit un score de matching pondere et explicable (voir
+    app.services.matching_score), et la liste est triee par score decroissant."""
+    certified = db.query(Certification).all()
 
-    # Grouper par apprenant
     prestataires_map: dict[int, dict] = {}
     for cert in certified:
-        # Verifier que la certification correspond au metier demande
         if metier_code:
             niveau = db.get(Niveau, cert.niveau_id)
             if not niveau:
@@ -109,15 +116,107 @@ def search_prestataires(
             apprenant = db.get(Apprenant, cert.apprenant_id)
             if not apprenant:
                 continue
-            prestataires_map[cert.apprenant_id] = {
+            trust = db.query(TrustScore).filter(TrustScore.apprenant_id == apprenant.id).first()
+            if not is_matching_eligible(apprenant, trust):
+                continue
+
+            entry: dict = {
                 "id": apprenant.id,
                 "firstname": apprenant.firstname,
                 "lastname": apprenant.lastname,
+                "email": apprenant.email,
                 "certifications": [],
+                "score": 0,
+                "trust_score": trust.score_pct,
             }
-        prestataires_map[cert.apprenant_id]["certifications"].append(cert.code)
+            if metier_code:
+                match = compute_match_score(db, apprenant, metier_code, trust)
+                entry["match_score"] = match["score"]
+                entry["match_breakdown"] = match["breakdown"]
+            prestataires_map[apprenant.id] = entry
 
-    return list(prestataires_map.values())
+        if cert.apprenant_id in prestataires_map:
+            prestataires_map[cert.apprenant_id]["certifications"].append(cert.code)
+
+    results = list(prestataires_map.values())
+    if metier_code:
+        results.sort(key=lambda r: r["match_score"] or 0, reverse=True)
+    return results
+
+
+@router.get("/prestataires/{apprenant_id}/trust-score", response_model=TrustScoreOut)
+@limiter.limit("30/minute")
+def get_trust_score(
+    request: Request,
+    apprenant_id: int,
+    recompute: bool = False,
+    db: Session = Depends(get_db),
+    admin: AdminUser | None = Depends(get_optional_admin),
+):
+    """Score de confiance d'un apprenant (public, transparent — pas de boite
+    noire). Retourne le score mis en cache s'il existe deja. `?recompute=true`
+    force un recalcul reserve aux admins : ce recalcul appelle Gemini (cout
+    reel) et ecrit en base, donc pas question de le laisser declenchable en
+    boucle par n'importe qui en GET public."""
+    apprenant = db.get(Apprenant, apprenant_id)
+    if not apprenant:
+        raise HTTPException(status_code=404, detail="Apprenant introuvable")
+
+    if recompute and admin is None:
+        raise HTTPException(status_code=403, detail="Recalcul reserve aux administrateurs")
+
+    trust = None if recompute else db.query(TrustScore).filter(TrustScore.apprenant_id == apprenant_id).first()
+    if trust is None:
+        trust = compute_trust_score(db, apprenant)
+
+    return TrustScoreOut(
+        apprenant_id=trust.apprenant_id,
+        score_pct=trust.score_pct,
+        rules_score=trust.rules_score,
+        rules_breakdown=json.loads(trust.rules_breakdown_json),
+        llm_score=trust.llm_score,
+        justification=trust.justification,
+        computed_at=trust.computed_at,
+    )
+
+
+@router.patch(
+    "/admin/apprenants/{apprenant_id}/verification",
+    response_model=TrustScoreOut,
+    dependencies=[Depends(get_current_admin)],
+)
+def update_verification(
+    apprenant_id: int,
+    payload: VerificationUpdate,
+    db: Session = Depends(get_db),
+):
+    """Verification manuelle d'un apprenant par un admin (identite / serieux)
+    et/ou mise a jour de ses references. Le score de confiance est
+    recalcule immediatement pour que l'effet du blocage automatique soit
+    demontrable en direct (verifie -> apparait dans le matching / non
+    verifie -> disparait)."""
+    apprenant = db.get(Apprenant, apprenant_id)
+    if not apprenant:
+        raise HTTPException(status_code=404, detail="Apprenant introuvable")
+
+    if payload.is_verified is not None:
+        apprenant.is_verified = payload.is_verified
+        apprenant.verified_at = func.now() if payload.is_verified else None
+    if payload.reference_notes is not None:
+        apprenant.reference_notes = payload.reference_notes
+    db.commit()
+    db.refresh(apprenant)
+
+    trust = compute_trust_score(db, apprenant)
+    return TrustScoreOut(
+        apprenant_id=trust.apprenant_id,
+        score_pct=trust.score_pct,
+        rules_score=trust.rules_score,
+        rules_breakdown=json.loads(trust.rules_breakdown_json),
+        llm_score=trust.llm_score,
+        justification=trust.justification,
+        computed_at=trust.computed_at,
+    )
 
 
 # ====================================================================
@@ -125,7 +224,9 @@ def search_prestataires(
 # ====================================================================
 
 @router.post("/chat")
+@limiter.limit("20/minute")
 def chat(
+    request: Request,
     payload: ChatRequest,
     db: Session = Depends(get_db),
 ):
@@ -170,7 +271,9 @@ def get_chat_session(
 
 
 @router.post("/chat/sessions/{session_id}/messages", response_model=ChatMessageOut, status_code=201)
+@limiter.limit("20/minute")
 def send_chat_message(
+    request: Request,
     session_id: int,
     payload: ChatRequest,
     current: Apprenant = Depends(get_current_apprenant),
@@ -389,6 +492,7 @@ def list_apprenants(db: Session = Depends(get_db)):
             .filter(Enrollment.apprenant_id == a.id, Enrollment.statut == "termine")
             .scalar()
         )
+        trust = db.query(TrustScore).filter(TrustScore.apprenant_id == a.id).first()
         result.append(ApprenantDetailOut(
             id=a.id,
             firstname=a.firstname,
@@ -399,5 +503,7 @@ def list_apprenants(db: Session = Depends(get_db)):
             certifications=[c.code for c in certs],
             enrollment_count=enrollment_count,
             completed_count=completed_count,
+            is_verified=a.is_verified,
+            trust_score=trust.score_pct if trust else None,
         ))
     return result

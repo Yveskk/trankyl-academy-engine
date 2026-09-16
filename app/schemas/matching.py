@@ -26,6 +26,24 @@ class PrestataireMatchOut(BaseModel):
     email: str
     certifications: list[str] = []
     score: int = 0
+    trust_score: float | None = None
+    match_score: float | None = None
+    match_breakdown: dict | None = None
+
+
+class TrustScoreOut(BaseModel):
+    apprenant_id: int
+    score_pct: float
+    rules_score: float
+    rules_breakdown: dict
+    llm_score: float | None
+    justification: str
+    computed_at: datetime
+
+
+class VerificationUpdate(BaseModel):
+    is_verified: bool | None = None
+    reference_notes: str | None = None
 
 
 class MatchOut(BaseModel):
@@ -82,6 +100,8 @@ class ApprenantDetailOut(ApprenantOut):
     certifications: list[str] = []
     enrollment_count: int = 0
     completed_count: int = 0
+    is_verified: bool = False
+    trust_score: float | None = None
 
 
 class ChatSessionOut(BaseModel):

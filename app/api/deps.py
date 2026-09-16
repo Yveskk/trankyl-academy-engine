@@ -47,3 +47,22 @@ def get_current_admin(
     if admin is None or not admin.is_active:
         raise credentials_exception
     return admin
+
+
+def get_optional_admin(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> AdminUser | None:
+    """Comme get_current_admin, mais ne leve jamais : retourne None si pas de
+    token / token invalide. Pour les endpoints publics dont seule UNE partie
+    du comportement (ex: forcer un recalcul couteux) doit rester reservee
+    aux admins."""
+    if credentials is None:
+        return None
+    payload = decode_access_token(credentials.credentials)
+    if payload is None or payload.get("role") != "admin":
+        return None
+    admin = db.get(AdminUser, int(payload["sub"]))
+    if admin is None or not admin.is_active:
+        return None
+    return admin
