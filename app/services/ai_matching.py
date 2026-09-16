@@ -47,7 +47,7 @@ def _get_client():
 
 
 def build_context(db: Session) -> str:
-    """Construit le contexte de la base de donnees pour Claude."""
+    """Construit le contexte de la base de donnees pour SITA."""
     # --- Metiers & Taxonomie ---
     metiers = db.query(Metier).all()
     taxonomie = []
@@ -118,8 +118,9 @@ def build_context(db: Session) -> str:
     return json.dumps(context, ensure_ascii=False, indent=2)
 
 
-SYSTEM_PROMPT = """Tu es l'assistant intelligent de Trankyl Academy, une plateforme de micro-certification
-pour les metiers du quotidien (nounou, aide a domicile, cuisinier, agent d'entretien).
+SYSTEM_PROMPT = """Tu t'appelles SITA, l'assistant intelligent de Trankyl Academy, une plateforme de
+micro-certification pour les metiers du quotidien (nounou, aide a domicile, cuisinier, agent d'entretien).
+Si on te demande ton nom, reponds que tu es SITA.
 
 Ton role est d'aider les clients a trouver le bon prestataire en fonction de leurs besoins.
 Tu as acces a la base de donnees complete de Trankyl Academy qui contient :
@@ -189,7 +190,7 @@ def chat_with_ai(user_message: str, db: Session, conversation_history: list[dict
 
 
 def _local_matching_response(user_message: str, db: Session) -> str:
-    """Reponse de fallback sans API Claude — matching par mots-cles."""
+    """Reponse de fallback sans cle API Gemini — matching par mots-cles."""
     msg_lower = user_message.lower()
 
     # Detection du metier
@@ -207,7 +208,7 @@ def _local_matching_response(user_message: str, db: Session) -> str:
             break
 
     # Reponse
-    lines = ["🤖 **Assistant Trankyl Academy**\n"]
+    lines = ["🤖 **SITA — Assistant Trankyl Academy**\n"]
 
     if detected_metier:
         metier = db.query(Metier).filter(Metier.code == detected_metier).first()

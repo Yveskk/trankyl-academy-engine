@@ -2,6 +2,8 @@ from datetime import date
 
 from pydantic import BaseModel
 
+from app.schemas.curriculum import ModuleOut
+
 
 class CompetenceCreate(BaseModel):
     code: str
@@ -13,6 +15,7 @@ class CompetenceCreate(BaseModel):
 class CompetenceOut(CompetenceCreate):
     id: int
     niveau_id: int
+    modules: list[ModuleOut] = []
 
     class Config:
         from_attributes = True

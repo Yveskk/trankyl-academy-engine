@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_admin
 from app.db.session import get_db
+from app.models.curriculum import Module
 from app.models.taxonomy import Competence, Metier, Niveau
 from app.schemas.taxonomy import (
     CompetenceCreate,
@@ -18,6 +19,12 @@ from app.schemas.taxonomy import (
 
 router = APIRouter()
 
+# Charge toute la hierarchie (niveaux -> competences -> modules -> quiz) en une
+# seule requete SQL, pour que le site n'ait plus besoin d'un aller-retour par
+# competence (GET /curriculum/modules?competence_id=...) apres avoir recupere
+# le metier : c'etait la cause principale de la lenteur au clic sur un metier.
+_METIER_DETAIL_LOADER = joinedload(Metier.niveaux).joinedload(Niveau.competences).joinedload(Competence.modules).joinedload(Module.quiz)
+
 
 # --- Lecture publique (site Academy, futur moteur de matching) ---
 
@@ -31,7 +38,7 @@ def list_metiers(db: Session = Depends(get_db)):
 def get_metier(code: str, db: Session = Depends(get_db)):
     metier = (
         db.query(Metier)
-        .options(joinedload(Metier.niveaux).joinedload(Niveau.competences))
+        .options(_METIER_DETAIL_LOADER)
         .filter(Metier.code == code, Metier.is_active.is_(True))
         .first()
     )
@@ -58,7 +65,7 @@ def get_metier_admin(metier_id: int, db: Session = Depends(get_db)):
     publique."""
     metier = (
         db.query(Metier)
-        .options(joinedload(Metier.niveaux).joinedload(Niveau.competences))
+        .options(_METIER_DETAIL_LOADER)
         .filter(Metier.id == metier_id)
         .first()
     )

@@ -17,6 +17,7 @@ class EnrollmentOut(BaseModel):
 class NiveauEnrollmentOut(BaseModel):
     id: int
     niveau_id: int
+    metier_id: int
     created_at: datetime
 
     class Config:
@@ -32,6 +33,7 @@ class NiveauEnrollmentAdminOut(BaseModel):
     niveau_nom: str
     niveau_numero: int
     date_debut: date | None
+    metier_id: int
     metier_code: str
     metier_nom: str
     created_at: datetime

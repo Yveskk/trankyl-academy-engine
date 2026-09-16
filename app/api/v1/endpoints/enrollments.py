@@ -72,6 +72,7 @@ def list_niveau_enrollments(db: Session = Depends(get_db)):
             niveau_nom=r.niveau.nom,
             niveau_numero=r.niveau.numero,
             date_debut=r.niveau.date_debut,
+            metier_id=r.metier_id,
             metier_code=r.niveau.metier.code,
             metier_nom=r.niveau.metier.nom,
             created_at=r.created_at,
@@ -94,7 +95,7 @@ def enroll_niveau(niveau_id: int, current: Apprenant = Depends(get_current_appre
     if existing:
         return existing
 
-    enrollment = NiveauEnrollment(apprenant_id=current.id, niveau_id=niveau_id)
+    enrollment = NiveauEnrollment(apprenant_id=current.id, niveau_id=niveau_id, metier_id=niveau.metier_id)
     db.add(enrollment)
     db.commit()
     db.refresh(enrollment)

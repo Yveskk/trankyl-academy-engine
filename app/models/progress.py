@@ -25,7 +25,9 @@ class Enrollment(Base):
 
 class NiveauEnrollment(Base):
     """Inscription d'un apprenant a un niveau complet (la cohorte qui demarre
-    a sa date_debut), distincte de l'inscription a un module individuel."""
+    a sa date_debut), distincte de l'inscription a un module individuel.
+    metier_id est denormalise (deduit de niveau.metier_id a la creation) pour
+    que l'admin puisse filtrer/afficher par metier sans jointure."""
 
     __tablename__ = "niveau_enrollments"
     __table_args__ = (UniqueConstraint("apprenant_id", "niveau_id", name="uq_niveau_enrollment_apprenant_niveau"),)
@@ -33,10 +35,12 @@ class NiveauEnrollment(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     apprenant_id: Mapped[int] = mapped_column(ForeignKey("apprenants.id", ondelete="CASCADE"), nullable=False)
     niveau_id: Mapped[int] = mapped_column(ForeignKey("niveaux.id", ondelete="CASCADE"), nullable=False)
+    metier_id: Mapped[int] = mapped_column(ForeignKey("metiers.id", ondelete="CASCADE"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     apprenant: Mapped["Apprenant"] = relationship()
     niveau: Mapped["Niveau"] = relationship()
+    metier: Mapped["Metier"] = relationship()
 
 
 class QuizAttempt(Base):

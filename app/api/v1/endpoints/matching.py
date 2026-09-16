@@ -121,7 +121,7 @@ def search_prestataires(
 
 
 # ====================================================================
-# ASSISTANT IA — CHAT DE MATCHING
+# SITA — ASSISTANT IA DE MATCHING
 # ====================================================================
 
 @router.post("/chat")
@@ -129,12 +129,12 @@ def chat(
     payload: ChatRequest,
     db: Session = Depends(get_db),
 ):
-    """Chat intelligent avec Claude — matching IA base sur les donnees DB."""
+    """Chat intelligent avec SITA (Gemini) — matching IA base sur les donnees DB."""
     try:
         response = chat_with_ai(payload.message, db, payload.history)
         return {"response": response}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur assistant IA: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur SITA: {str(e)}")
 
 
 @router.post("/chat/sessions", response_model=ChatSessionOut, status_code=201)

@@ -7,7 +7,7 @@ from app.db.base import Base
 
 
 class ChatSession(Base):
-    """Une session de chat entre un utilisateur et l'assistant IA."""
+    """Une session de chat entre un utilisateur et SITA, l'assistant IA."""
     __tablename__ = "chat_sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
