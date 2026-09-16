@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -15,6 +15,7 @@ class Metier(Base):
     code: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     nom: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     niveaux: Mapped[list["Niveau"]] = relationship(back_populates="metier", cascade="all, delete-orphan", order_by="Niveau.numero")
@@ -31,6 +32,7 @@ class Niveau(Base):
     numero: Mapped[int] = mapped_column(Integer, nullable=False)
     nom: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    date_debut: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     metier: Mapped["Metier"] = relationship(back_populates="niveaux")
     competences: Mapped[list["Competence"]] = relationship(back_populates="niveau", cascade="all, delete-orphan", order_by="Competence.ordre")

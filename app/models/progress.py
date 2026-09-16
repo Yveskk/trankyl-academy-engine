@@ -23,6 +23,22 @@ class Enrollment(Base):
     module: Mapped["Module"] = relationship(back_populates="enrollments")
 
 
+class NiveauEnrollment(Base):
+    """Inscription d'un apprenant a un niveau complet (la cohorte qui demarre
+    a sa date_debut), distincte de l'inscription a un module individuel."""
+
+    __tablename__ = "niveau_enrollments"
+    __table_args__ = (UniqueConstraint("apprenant_id", "niveau_id", name="uq_niveau_enrollment_apprenant_niveau"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    apprenant_id: Mapped[int] = mapped_column(ForeignKey("apprenants.id", ondelete="CASCADE"), nullable=False)
+    niveau_id: Mapped[int] = mapped_column(ForeignKey("niveaux.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    apprenant: Mapped["Apprenant"] = relationship()
+    niveau: Mapped["Niveau"] = relationship()
+
+
 class QuizAttempt(Base):
     """Une tentative de quiz par un apprenant, corrigee automatiquement."""
 

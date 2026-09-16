@@ -10,3 +10,4 @@ python-jose[cryptography]>=3.3
 bcrypt>=4.1
 python-multipart>=0.0.9
 python-dotenv>=1.0
+google-genai>=1.0

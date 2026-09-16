@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel
 
 
@@ -20,6 +22,11 @@ class NiveauCreate(BaseModel):
     numero: int
     nom: str
     description: str | None = None
+    date_debut: date | None = None
+
+
+class NiveauUpdate(NiveauCreate):
+    pass
 
 
 class NiveauOut(NiveauCreate):
@@ -37,8 +44,13 @@ class MetierCreate(BaseModel):
     description: str | None = None
 
 
+class MetierUpdate(MetierCreate):
+    is_active: bool = True
+
+
 class MetierOut(MetierCreate):
     id: int
+    is_active: bool
 
     class Config:
         from_attributes = True

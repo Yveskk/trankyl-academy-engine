@@ -1,3 +1,9 @@
+import os
+from dotenv import load_dotenv
+
+# Charger le .env dans os.environ AVANT tout import
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"), override=True)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
