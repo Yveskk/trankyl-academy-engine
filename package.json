@@ -1,0 +1,11 @@
+{
+  "name": "trankyl-academy-engine",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Backend FastAPI de Trankyl Academy",
+  "scripts": {
+    "start": "bash scripts/start.sh",
+    "dev": "bash scripts/start.sh --reload",
+    "create-admin": "python3 -m scripts.create_admin"
+  }
+}
