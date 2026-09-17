@@ -5,7 +5,7 @@ from app.api.deps import get_current_admin
 from app.db.session import get_db
 from app.models.curriculum import Module, Quiz, QuizChoice, QuizQuestion
 from app.models.taxonomy import Competence
-from app.schemas.curriculum import ModuleCreate, ModuleOut, QuizCreate, QuizOut
+from app.schemas.curriculum import ModuleCreate, ModuleOut, ModuleUpdate, QuizCreate, QuizOut
 
 router = APIRouter()
 
@@ -78,6 +78,26 @@ def create_quiz(payload: QuizCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(quiz)
     return quiz
+
+
+@router.put("/modules/{module_id}", response_model=ModuleOut, dependencies=[Depends(get_current_admin)])
+def update_module(module_id: int, payload: ModuleUpdate, db: Session = Depends(get_db)):
+    module = db.get(Module, module_id)
+    if not module:
+        raise HTTPException(status_code=404, detail="Module introuvable")
+    existing_code = db.query(Module).filter(Module.code == payload.code, Module.id != module_id).first()
+    if existing_code:
+        raise HTTPException(status_code=400, detail="Ce code module existe deja")
+    module.code = payload.code
+    module.titre = payload.titre
+    module.contenu = payload.contenu
+    module.titre_en = payload.titre_en
+    module.contenu_en = payload.contenu_en
+    module.duree_heures = payload.duree_heures
+    module.ordre = payload.ordre
+    db.commit()
+    db.refresh(module)
+    return module
 
 
 @router.delete("/modules/{module_id}", status_code=204, dependencies=[Depends(get_current_admin)])

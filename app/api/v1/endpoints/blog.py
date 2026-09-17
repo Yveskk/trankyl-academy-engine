@@ -20,6 +20,9 @@ def _to_detail(article: BlogArticle) -> BlogArticleDetailOut:
         title=article.title,
         excerpt=article.excerpt,
         category=article.category,
+        title_en=article.title_en,
+        excerpt_en=article.excerpt_en,
+        category_en=article.category_en,
         read_time=article.read_time,
         cover=article.cover,
         cover_image_url=article.cover_image_url,
@@ -27,6 +30,7 @@ def _to_detail(article: BlogArticle) -> BlogArticleDetailOut:
         is_active=article.is_active,
         updated_at=article.updated_at,
         content=article.content.split("\n\n"),
+        content_en=article.content_en.split("\n\n") if article.content_en else None,
     )
 
 
@@ -87,11 +91,15 @@ def create_article(payload: BlogArticleCreate, db: Session = Depends(get_db)):
         title=payload.title,
         excerpt=payload.excerpt,
         category=payload.category,
+        title_en=payload.title_en,
+        excerpt_en=payload.excerpt_en,
+        category_en=payload.category_en,
         read_time=payload.read_time,
         cover=payload.cover,
         cover_image_url=payload.cover_image_url,
         published_at=payload.published_at,
         content="\n\n".join(payload.content),
+        content_en="\n\n".join(payload.content_en) if payload.content_en else None,
     )
     db.add(article)
     db.commit()
@@ -114,11 +122,15 @@ def update_article(article_id: int, payload: BlogArticleUpdate, db: Session = De
     article.title = payload.title
     article.excerpt = payload.excerpt
     article.category = payload.category
+    article.title_en = payload.title_en
+    article.excerpt_en = payload.excerpt_en
+    article.category_en = payload.category_en
     article.read_time = payload.read_time
     article.cover = payload.cover
     article.cover_image_url = payload.cover_image_url
     article.published_at = payload.published_at
     article.content = "\n\n".join(payload.content)
+    article.content_en = "\n\n".join(payload.content_en) if payload.content_en else None
     article.is_active = payload.is_active
     db.commit()
     db.refresh(article)

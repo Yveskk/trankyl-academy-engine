@@ -6,12 +6,15 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_admin, get_current_client, get_current_client_or_apprenant
 from app.db.session import get_db
+from app.models.certification import Certification
 from app.models.client import Client
 from app.models.contact_request import ContactMessage, ContactRequest
+from app.models.trust import TrustScore
 from app.models.user import Apprenant
 from app.schemas.contact_request import (
     ContactMessageCreate,
@@ -135,30 +138,60 @@ def my_contact_requests_as_prestataire(
     ]
 
 
+def _build_admin_out(db: Session, req: ContactRequest) -> ContactRequestAdminOut:
+    """Assemble la vue admin d'une demande avec tout ce qui aide a la
+    modération : coordonnées completes des deux parties, statut de
+    verification et score de confiance du prestataire, ses certifications,
+    l'historique de demandes du client (pour reperer un usage abusif), et
+    l'activite du fil de discussion une fois approuve."""
+    client_total_requests = db.query(ContactRequest).filter(ContactRequest.client_id == req.client_id).count()
+
+    trust = db.query(TrustScore).filter(TrustScore.apprenant_id == req.prestataire_id).first()
+    certifications = [
+        c.code for c in db.query(Certification).filter(Certification.apprenant_id == req.prestataire_id).all()
+    ]
+
+    message_count = len(req.messages)
+    last_message_at = req.messages[-1].created_at if req.messages else None
+
+    return ContactRequestAdminOut(
+        id=req.id,
+        client_id=req.client_id,
+        prestataire_id=req.prestataire_id,
+        initial_message=req.initial_message,
+        status=req.status,
+        created_at=req.created_at,
+        reviewed_at=req.reviewed_at,
+        client_nom=f"{req.client.firstname} {req.client.lastname}",
+        client_email=req.client.email,
+        client_phone=req.client.phone,
+        client_created_at=req.client.created_at,
+        client_total_requests=client_total_requests,
+        prestataire_nom=f"{req.prestataire.firstname} {req.prestataire.lastname}",
+        prestataire_email=req.prestataire.email,
+        prestataire_phone=req.prestataire.phone,
+        prestataire_is_verified=req.prestataire.is_verified,
+        prestataire_trust_score=trust.score_pct if trust else None,
+        prestataire_certifications=certifications,
+        prestataire_created_at=req.prestataire.created_at,
+        message_count=message_count,
+        last_message_at=last_message_at,
+    )
+
+
 @router.get("/admin", response_model=list[ContactRequestAdminOut], dependencies=[Depends(get_current_admin)])
 def admin_list_contact_requests(db: Session = Depends(get_db)):
     rows = (
         db.query(ContactRequest)
-        .options(joinedload(ContactRequest.client), joinedload(ContactRequest.prestataire))
+        .options(
+            joinedload(ContactRequest.client),
+            joinedload(ContactRequest.prestataire),
+            joinedload(ContactRequest.messages),
+        )
         .order_by(ContactRequest.created_at.desc())
         .all()
     )
-    return [
-        ContactRequestAdminOut(
-            id=r.id,
-            client_id=r.client_id,
-            prestataire_id=r.prestataire_id,
-            initial_message=r.initial_message,
-            status=r.status,
-            created_at=r.created_at,
-            reviewed_at=r.reviewed_at,
-            client_nom=f"{r.client.firstname} {r.client.lastname}",
-            client_email=r.client.email,
-            prestataire_nom=f"{r.prestataire.firstname} {r.prestataire.lastname}",
-            prestataire_email=r.prestataire.email,
-        )
-        for r in rows
-    ]
+    return [_build_admin_out(db, r) for r in rows]
 
 
 @router.patch(
@@ -172,19 +205,27 @@ def review_contact_request(request_id: int, payload: ContactRequestReview, db: S
     req.reviewed_at = datetime.utcnow()
     db.commit()
     db.refresh(req)
-    return ContactRequestAdminOut(
-        id=req.id,
-        client_id=req.client_id,
-        prestataire_id=req.prestataire_id,
-        initial_message=req.initial_message,
-        status=req.status,
-        created_at=req.created_at,
-        reviewed_at=req.reviewed_at,
-        client_nom=f"{req.client.firstname} {req.client.lastname}",
-        client_email=req.client.email,
-        prestataire_nom=f"{req.prestataire.firstname} {req.prestataire.lastname}",
-        prestataire_email=req.prestataire.email,
+    return _build_admin_out(db, req)
+
+
+@router.get("/unread/count")
+def unread_contact_message_count(
+    current: tuple[str, int] = Depends(get_current_client_or_apprenant),
+    db: Session = Depends(get_db),
+):
+    """Nombre total de messages non lus, tous fils de discussion approuves
+    confondus, pour le client ou le prestataire connecte. Alimente le badge
+    de notification dans la barre de navigation."""
+    role, user_id = current
+    filter_col = ContactRequest.client_id if role == "client" else ContactRequest.prestataire_id
+    other_role = "prestataire" if role == "client" else "client"
+    count = (
+        db.query(func.count(ContactMessage.id))
+        .join(ContactRequest, ContactMessage.contact_request_id == ContactRequest.id)
+        .filter(filter_col == user_id, ContactMessage.sender_role == other_role, ContactMessage.read.is_(False))
+        .scalar()
     )
+    return {"count": count}
 
 
 def _get_authorized_request(db: Session, request_id: int, role: str, user_id: int) -> ContactRequest:

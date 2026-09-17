@@ -7,6 +7,8 @@ class ContentSectionOut(BaseModel):
     key: str
     title: str
     subtitle: str | None
+    title_en: str | None = None
+    subtitle_en: str | None = None
     is_active: bool
     updated_at: datetime
 
@@ -17,4 +19,6 @@ class ContentSectionOut(BaseModel):
 class ContentSectionUpsert(BaseModel):
     title: str
     subtitle: str | None = None
+    title_en: str | None = None
+    subtitle_en: str | None = None
     is_active: bool = True

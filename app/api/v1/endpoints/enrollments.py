@@ -56,10 +56,12 @@ def my_niveau_enrollments(current: Apprenant = Depends(get_current_apprenant), d
             niveau_id=r.niveau_id,
             metier_id=r.metier_id,
             niveau_nom=r.niveau.nom,
+            niveau_nom_en=r.niveau.nom_en,
             niveau_numero=r.niveau.numero,
             date_debut=r.niveau.date_debut,
             metier_code=r.niveau.metier.code,
             metier_nom=r.niveau.metier.nom,
+            metier_nom_en=r.niveau.metier.nom_en,
             created_at=r.created_at,
         )
         for r in rows

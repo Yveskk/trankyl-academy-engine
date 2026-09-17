@@ -8,6 +8,11 @@ class BlogArticleBase(BaseModel):
     title: str
     excerpt: str
     category: str
+    # Traduction anglaise, saisie manuellement par l'admin : optionnelle,
+    # repli sur le francais si vide.
+    title_en: str | None = None
+    excerpt_en: str | None = None
+    category_en: str | None = None
     read_time: str = "3 min"
     cover: str = "green"
     cover_image_url: str | None = None
@@ -23,10 +28,12 @@ class BlogArticleBase(BaseModel):
 
 class BlogArticleCreate(BlogArticleBase):
     content: list[str]
+    content_en: list[str] | None = None
 
 
 class BlogArticleUpdate(BlogArticleBase):
     content: list[str]
+    content_en: list[str] | None = None
     is_active: bool = True
 
 
@@ -41,3 +48,4 @@ class BlogArticleOut(BlogArticleBase):
 
 class BlogArticleDetailOut(BlogArticleOut):
     content: list[str]
+    content_en: list[str] | None = None

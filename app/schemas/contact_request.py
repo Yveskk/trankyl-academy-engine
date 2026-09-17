@@ -22,8 +22,20 @@ class ContactRequestOut(BaseModel):
 class ContactRequestAdminOut(ContactRequestOut):
     client_nom: str
     client_email: str
+    client_phone: str | None
+    client_created_at: datetime
+    client_total_requests: int
+
     prestataire_nom: str
     prestataire_email: str
+    prestataire_phone: str | None
+    prestataire_is_verified: bool
+    prestataire_trust_score: float | None
+    prestataire_certifications: list[str]
+    prestataire_created_at: datetime
+
+    message_count: int
+    last_message_at: datetime | None
 
 
 class ContactRequestClientOut(ContactRequestOut):

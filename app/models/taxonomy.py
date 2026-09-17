@@ -15,6 +15,10 @@ class Metier(Base):
     code: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     nom: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Traduction anglaise, saisie manuellement par l'admin. Optionnelle : le
+    # site retombe sur le francais (nom/description) si vide.
+    nom_en: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description_en: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -32,6 +36,8 @@ class Niveau(Base):
     numero: Mapped[int] = mapped_column(Integer, nullable=False)
     nom: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    nom_en: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description_en: Mapped[str | None] = mapped_column(Text, nullable=True)
     date_debut: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     metier: Mapped["Metier"] = relationship(back_populates="niveaux")
@@ -53,6 +59,8 @@ class Competence(Base):
     code: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     titre: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    titre_en: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description_en: Mapped[str | None] = mapped_column(Text, nullable=True)
     ordre: Mapped[int] = mapped_column(Integer, default=0)
 
     niveau: Mapped["Niveau"] = relationship(back_populates="competences")

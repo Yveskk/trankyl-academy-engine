@@ -19,6 +19,12 @@ class BlogArticle(Base):
     category: Mapped[str] = mapped_column(String(100), nullable=False)
     # Paragraphes separes par une ligne vide ("\n\n"), decoupes cote API.
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # Traduction anglaise, saisie manuellement par l'admin (meme logique que
+    # la taxonomie) : optionnelle, repli sur le francais si vide.
+    title_en: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    excerpt_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    category_en: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    content_en: Mapped[str | None] = mapped_column(Text, nullable=True)
     read_time: Mapped[str] = mapped_column(String(20), default="3 min")
     cover: Mapped[str] = mapped_column(String(10), default="green")  # "green" | "gold", utilise si pas d'image
     cover_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)

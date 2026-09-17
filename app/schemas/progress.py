@@ -26,10 +26,12 @@ class NiveauEnrollmentOut(BaseModel):
 
 class NiveauEnrollmentMineOut(NiveauEnrollmentOut):
     niveau_nom: str
+    niveau_nom_en: str | None = None
     niveau_numero: int
     date_debut: date | None
     metier_code: str
     metier_nom: str
+    metier_nom_en: str | None = None
 
 
 class NiveauEnrollmentAdminOut(BaseModel):

@@ -48,9 +48,18 @@ def upsert_section(key: str, payload: ContentSectionUpsert, db: Session = Depend
     if section:
         section.title = payload.title
         section.subtitle = payload.subtitle
+        section.title_en = payload.title_en
+        section.subtitle_en = payload.subtitle_en
         section.is_active = payload.is_active
     else:
-        section = ContentSection(key=key, title=payload.title, subtitle=payload.subtitle, is_active=payload.is_active)
+        section = ContentSection(
+            key=key,
+            title=payload.title,
+            subtitle=payload.subtitle,
+            title_en=payload.title_en,
+            subtitle_en=payload.subtitle_en,
+            is_active=payload.is_active,
+        )
         db.add(section)
     db.commit()
     db.refresh(section)

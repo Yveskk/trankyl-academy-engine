@@ -6,6 +6,18 @@ class ModuleCreate(BaseModel):
     code: str
     titre: str
     contenu: str | None = None
+    titre_en: str | None = None
+    contenu_en: str | None = None
+    duree_heures: float = 2
+    ordre: int = 0
+
+
+class ModuleUpdate(BaseModel):
+    code: str
+    titre: str
+    contenu: str | None = None
+    titre_en: str | None = None
+    contenu_en: str | None = None
     duree_heures: float = 2
     ordre: int = 0
 
@@ -16,6 +28,8 @@ class ModuleOut(BaseModel):
     code: str
     titre: str
     contenu: str | None
+    titre_en: str | None = None
+    contenu_en: str | None = None
     duree_heures: float
     ordre: int
     has_quiz: bool = False

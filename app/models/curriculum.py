@@ -17,6 +17,8 @@ class Module(Base):
     code: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     titre: Mapped[str] = mapped_column(String(255), nullable=False)
     contenu: Mapped[str | None] = mapped_column(Text, nullable=True)
+    titre_en: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    contenu_en: Mapped[str | None] = mapped_column(Text, nullable=True)
     duree_heures: Mapped[float] = mapped_column(default=2)
     ordre: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

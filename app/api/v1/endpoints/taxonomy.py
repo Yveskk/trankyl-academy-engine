@@ -96,6 +96,8 @@ def update_metier(metier_id: int, payload: MetierUpdate, db: Session = Depends(g
     metier.code = payload.code
     metier.nom = payload.nom
     metier.description = payload.description
+    metier.nom_en = payload.nom_en
+    metier.description_en = payload.description_en
     metier.is_active = payload.is_active
     db.commit()
     db.refresh(metier)
@@ -122,6 +124,8 @@ def update_niveau(niveau_id: int, payload: NiveauUpdate, db: Session = Depends(g
     niveau.numero = payload.numero
     niveau.nom = payload.nom
     niveau.description = payload.description
+    niveau.nom_en = payload.nom_en
+    niveau.description_en = payload.description_en
     niveau.date_debut = payload.date_debut
     db.commit()
     db.refresh(niveau)
