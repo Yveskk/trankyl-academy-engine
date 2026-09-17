@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.models.certification import Certification
 from app.models.progress import Enrollment, NiveauEnrollment, QuizAttempt
+from app.models.review import Review
 from app.models.trust import TrustScore
 from app.models.user import Apprenant
 from app.services.ai_matching import _get_client
@@ -27,13 +28,16 @@ from app.services.ai_matching import _get_client
 # --- Composante "regles" (somme des poids = 1.0) --------------------------
 RULES_WEIGHTS = {
     # part des niveaux inscrits (niveau_enrollments) effectivement certifies
-    "certifications": 0.40,
+    "certifications": 0.30,
     # moyenne des scores obtenus aux tentatives de quiz (0-100 -> 0-1)
-    "quiz_quality": 0.30,
+    "quiz_quality": 0.20,
     # part des modules commences qui ont ete termines
-    "completion_rate": 0.15,
+    "completion_rate": 0.10,
     # compte verifie manuellement par un admin (identite / serieux) : 0 ou 1
     "account_verified": 0.15,
+    # moyenne des avis clients (1-5 etoiles -> 0-100%) — 0% si aucun avis,
+    # on ne fabrique jamais un signal positif a partir de l'absence de donnee
+    "client_reviews": 0.25,
 }
 assert abs(sum(RULES_WEIGHTS.values()) - 1.0) < 1e-9, "RULES_WEIGHTS doit sommer a 1.0"
 
@@ -108,6 +112,16 @@ def _rules_component(db: Session, apprenant: Apprenant) -> tuple[float, dict]:
         "value_pct": round(verified_ratio * 100, 1),
         "weight": RULES_WEIGHTS["account_verified"],
         "detail": "verifie" if apprenant.is_verified else "non verifie",
+    }
+
+    # 5. Moyenne des avis clients (1-5 etoiles)
+    ratings = [r[0] for r in db.query(Review.rating).filter(Review.prestataire_id == apprenant.id).all()]
+    reviews_ratio = ((sum(ratings) / len(ratings)) / 5.0) if ratings else 0.0
+    breakdown["client_reviews"] = {
+        "label": "Moyenne des avis clients",
+        "value_pct": round(reviews_ratio * 100, 1),
+        "weight": RULES_WEIGHTS["client_reviews"],
+        "detail": f"{len(ratings)} avis, moyenne {sum(ratings) / len(ratings):.1f}/5" if ratings else "aucun avis",
     }
 
     rules_score = sum(breakdown[k]["value_pct"] / 100 * RULES_WEIGHTS[k] for k in RULES_WEIGHTS) * 100

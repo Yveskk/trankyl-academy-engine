@@ -6,10 +6,11 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import get_current_admin, get_current_apprenant, get_optional_admin
+from app.api.deps import get_current_admin, get_current_apprenant, get_current_client, get_optional_admin
 from app.core.rate_limit import limiter
 from app.db.session import get_db
 from app.models.certification import Certification
+from app.models.client import Client
 from app.models.curriculum import Module
 from app.models.matching import MatchingRequest, Match, Message
 from app.models.chat_history import ChatSession, ChatMessageRecord
@@ -52,7 +53,7 @@ class ChatRequest(BaseModel):
 @router.post("/requests", response_model=MatchingRequestOut, status_code=201)
 def create_matching_request(
     payload: MatchingRequestCreate,
-    current: Apprenant = Depends(get_current_apprenant),
+    current: Client = Depends(get_current_client),
     db: Session = Depends(get_db),
 ):
     """Le client crée une demande de recherche de prestataire pour un metier."""
@@ -71,7 +72,7 @@ def create_matching_request(
 
 @router.get("/requests", response_model=list[MatchingRequestOut])
 def my_requests(
-    current: Apprenant = Depends(get_current_apprenant),
+    current: Client = Depends(get_current_client),
     db: Session = Depends(get_db),
 ):
     return db.query(MatchingRequest).filter(MatchingRequest.client_id == current.id).order_by(MatchingRequest.created_at.desc()).all()
@@ -80,7 +81,7 @@ def my_requests(
 @router.get("/requests/{request_id}/matches", response_model=list[MatchOut])
 def get_matches(
     request_id: int,
-    current: Apprenant = Depends(get_current_apprenant),
+    current: Client = Depends(get_current_client),
     db: Session = Depends(get_db),
 ):
     req = db.get(MatchingRequest, request_id)
@@ -240,7 +241,7 @@ def chat(
 
 @router.post("/chat/sessions", response_model=ChatSessionOut, status_code=201)
 def create_chat_session(
-    current: Apprenant = Depends(get_current_apprenant),
+    current: Client = Depends(get_current_client),
     db: Session = Depends(get_db),
 ):
     session = ChatSession(user_id=current.id)
@@ -252,7 +253,7 @@ def create_chat_session(
 
 @router.get("/chat/sessions", response_model=list[ChatSessionOut])
 def list_chat_sessions(
-    current: Apprenant = Depends(get_current_apprenant),
+    current: Client = Depends(get_current_client),
     db: Session = Depends(get_db),
 ):
     return db.query(ChatSession).filter(ChatSession.user_id == current.id).order_by(ChatSession.updated_at.desc()).all()
@@ -261,7 +262,7 @@ def list_chat_sessions(
 @router.get("/chat/sessions/{session_id}", response_model=ChatSessionDetailOut)
 def get_chat_session(
     session_id: int,
-    current: Apprenant = Depends(get_current_apprenant),
+    current: Client = Depends(get_current_client),
     db: Session = Depends(get_db),
 ):
     session = db.get(ChatSession, session_id)
@@ -276,7 +277,7 @@ def send_chat_message(
     request: Request,
     session_id: int,
     payload: ChatRequest,
-    current: Apprenant = Depends(get_current_apprenant),
+    current: Client = Depends(get_current_client),
     db: Session = Depends(get_db),
 ):
     """Envoie un message dans une session et retourne la reponse IA avec boutons."""
@@ -322,7 +323,7 @@ def send_chat_message(
 @router.delete("/chat/sessions/{session_id}", status_code=204)
 def delete_chat_session(
     session_id: int,
-    current: Apprenant = Depends(get_current_apprenant),
+    current: Client = Depends(get_current_client),
     db: Session = Depends(get_db),
 ):
     session = db.get(ChatSession, session_id)

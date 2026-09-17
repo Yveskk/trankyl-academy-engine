@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  trankyl_academy_engine_prod:
+    container_name: trankyl_academy_engine_prod
+    image: trankyldev/trankyl_academy_engine_prod:latest
+    restart: always
+    env_file:
+      - .env.prod
+    environment:
+      - PORT=8000
+    ports:
+      - "9002:8000"
+    networks:
+      e_global:
+        aliases:
+          - trankyl_academy_engine_prod
+
+networks:
+  e_global:
+    external: true

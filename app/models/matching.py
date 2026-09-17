@@ -7,16 +7,17 @@ from app.db.base import Base
 
 
 class MatchingRequest(Base):
-    """Demande d'un client cherchant un prestataire pour un metier donne."""
+    """Demande d'un client (foyer) cherchant un prestataire pour un metier
+    donne. Rattachee a `clients`, pas `apprenants`."""
     __tablename__ = "matching_requests"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    client_id: Mapped[int] = mapped_column(ForeignKey("apprenants.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     metier_code: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    client: Mapped["Apprenant"] = relationship()  # type: ignore[name-defined]
+    client: Mapped["Client"] = relationship()  # type: ignore[name-defined]
     matches: Mapped[list["Match"]] = relationship(back_populates="request", cascade="all, delete-orphan")
 
 

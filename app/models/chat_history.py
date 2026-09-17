@@ -7,16 +7,18 @@ from app.db.base import Base
 
 
 class ChatSession(Base):
-    """Une session de chat entre un utilisateur et SITA, l'assistant IA."""
+    """Une session de chat entre un CLIENT (foyer cherchant un prestataire)
+    et SITA, l'assistant IA. Rattachee a `clients`, pas `apprenants` : c'est
+    un foyer qui cherche de l'aide, pas quelqu'un qui se forme."""
     __tablename__ = "chat_sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("apprenants.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     title: Mapped[str] = mapped_column(String(255), default="Nouvelle conversation")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    user: Mapped["Apprenant"] = relationship()  # type: ignore[name-defined]
+    user: Mapped["Client"] = relationship()  # type: ignore[name-defined]
     messages: Mapped[list["ChatMessageRecord"]] = relationship(back_populates="session", cascade="all, delete-orphan", order_by="ChatMessageRecord.created_at")
 
 

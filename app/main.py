@@ -21,6 +21,9 @@ tags_metadata = [
     {"name": "quizzes", "description": "Soumission des tentatives de quiz, corrigees automatiquement."},
     {"name": "certifications", "description": "Certifications obtenues par l'apprenant connecte."},
     {"name": "blog", "description": "Articles de blog. Lecture publique, ecriture admin."},
+    {"name": "banners", "description": "Images de la banniere d'accueil (max 3). Lecture publique, ecriture admin."},
+    {"name": "reviews", "description": "Avis clients sur les prestataires. Lecture publique, ecriture client connecte."},
+    {"name": "contact-requests", "description": "Mise en relation client<->prestataire, moderee par l'admin."},
 ]
 
 app = FastAPI(

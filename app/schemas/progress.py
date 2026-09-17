@@ -24,6 +24,14 @@ class NiveauEnrollmentOut(BaseModel):
         from_attributes = True
 
 
+class NiveauEnrollmentMineOut(NiveauEnrollmentOut):
+    niveau_nom: str
+    niveau_numero: int
+    date_debut: date | None
+    metier_code: str
+    metier_nom: str
+
+
 class NiveauEnrollmentAdminOut(BaseModel):
     id: int
     apprenant_id: int

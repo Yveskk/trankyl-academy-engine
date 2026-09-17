@@ -7,7 +7,7 @@ from app.models.curriculum import Module
 from app.models.progress import Enrollment, NiveauEnrollment
 from app.models.taxonomy import Niveau
 from app.models.user import Apprenant
-from app.schemas.progress import EnrollmentOut, NiveauEnrollmentAdminOut, NiveauEnrollmentOut
+from app.schemas.progress import EnrollmentOut, NiveauEnrollmentAdminOut, NiveauEnrollmentMineOut, NiveauEnrollmentOut
 
 router = APIRouter()
 
@@ -41,9 +41,29 @@ def enroll(module_id: int, current: Apprenant = Depends(get_current_apprenant), 
 # --- Inscription a un niveau complet (cohorte avec date de debut) ---
 
 
-@router.get("/niveaux/me", response_model=list[NiveauEnrollmentOut])
+@router.get("/niveaux/me", response_model=list[NiveauEnrollmentMineOut])
 def my_niveau_enrollments(current: Apprenant = Depends(get_current_apprenant), db: Session = Depends(get_db)):
-    return db.query(NiveauEnrollment).filter(NiveauEnrollment.apprenant_id == current.id).all()
+    rows = (
+        db.query(NiveauEnrollment)
+        .options(joinedload(NiveauEnrollment.niveau).joinedload(Niveau.metier))
+        .filter(NiveauEnrollment.apprenant_id == current.id)
+        .order_by(NiveauEnrollment.created_at.desc())
+        .all()
+    )
+    return [
+        NiveauEnrollmentMineOut(
+            id=r.id,
+            niveau_id=r.niveau_id,
+            metier_id=r.metier_id,
+            niveau_nom=r.niveau.nom,
+            niveau_numero=r.niveau.numero,
+            date_debut=r.niveau.date_debut,
+            metier_code=r.niveau.metier.code,
+            metier_nom=r.niveau.metier.nom,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
 
 
 @router.get(
