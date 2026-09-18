@@ -1,7 +1,10 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin, get_current_apprenant, get_current_client
+from app.core.ids import generate_unique_id
 from app.core.rate_limit import limiter
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
@@ -33,11 +36,14 @@ def register(request: Request, payload: ApprenantRegister, db: Session = Depends
     if db.query(Apprenant).filter(Apprenant.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Un compte existe deja avec cet email")
     apprenant = Apprenant(
-        firstname=payload.firstname,
-        lastname=payload.lastname,
+        vendor_unique_id=generate_unique_id("VEN"),
+        vendor_name=f"{payload.firstname} {payload.lastname}".strip(),
         email=payload.email,
         phone=payload.phone,
         hashed_password=hash_password(payload.password),
+        academy_status="apprentice",
+        is_active_raw="1",
+        created_at=datetime.utcnow(),
     )
     db.add(apprenant)
     db.commit()
@@ -69,11 +75,12 @@ def register_client(request: Request, payload: ClientRegister, db: Session = Dep
     if db.query(Client).filter(Client.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Un compte existe deja avec cet email")
     client = Client(
-        firstname=payload.firstname,
-        lastname=payload.lastname,
+        client_unique_id=generate_unique_id("CLI"),
+        client_name=f"{payload.firstname} {payload.lastname}".strip(),
         email=payload.email,
         phone=payload.phone,
         hashed_password=hash_password(payload.password),
+        is_active_raw=1,
     )
     db.add(client)
     db.commit()

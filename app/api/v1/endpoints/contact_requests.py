@@ -91,6 +91,9 @@ def my_contact_requests_as_client(
         .order_by(ContactRequest.created_at.desc())
         .all()
     )
+    # Le prestataire peut avoir ete supprime du marketplace Trankyl depuis
+    # (compte ferme) : on ignore ces demandes orphelines plutot que de
+    # planter l'affichage.
     return [
         ContactRequestClientOut(
             id=r.id,
@@ -104,6 +107,7 @@ def my_contact_requests_as_client(
             **_unread_and_last(r, "client"),
         )
         for r in rows
+        if r.prestataire is not None
     ]
 
 
@@ -122,6 +126,9 @@ def my_contact_requests_as_prestataire(
         .order_by(ContactRequest.created_at.desc())
         .all()
     )
+    # Le client peut avoir ete supprime du marketplace Trankyl depuis
+    # (compte ferme) : on ignore ces demandes orphelines plutot que de
+    # planter l'affichage.
     return [
         ContactRequestPrestataireOut(
             id=r.id,
@@ -135,6 +142,7 @@ def my_contact_requests_as_prestataire(
             **_unread_and_last(r, "prestataire"),
         )
         for r in rows
+        if r.client is not None
     ]
 
 
@@ -191,7 +199,10 @@ def admin_list_contact_requests(db: Session = Depends(get_db)):
         .order_by(ContactRequest.created_at.desc())
         .all()
     )
-    return [_build_admin_out(db, r) for r in rows]
+    # Client ou prestataire peut avoir ete supprime du marketplace Trankyl
+    # depuis (compte ferme) : on ignore ces demandes orphelines plutot que
+    # de planter l'affichage admin.
+    return [_build_admin_out(db, r) for r in rows if r.client is not None and r.prestataire is not None]
 
 
 @router.patch(

@@ -7,14 +7,14 @@ from app.db.base import Base
 
 
 class ContentSection(Base):
-    """Bloc de texte editorial du site (titre + sous-titre), identifie par une
-    cle stable (ex: "home_careers"). Gere depuis l'admin, avec un interrupteur
-    pour le masquer du site public sans supprimer le contenu."""
+    """Bloc de texte editorial du site, identifie par une cle stable (ex:
+    "home_careers"). Table `academy_content_sections` (base partagee
+    Trankyl) : `key` est directement la cle primaire (pas de colonne `id`
+    separee dans cette table)."""
 
-    __tablename__ = "content_sections"
+    __tablename__ = "academy_content_sections"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    key: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     subtitle: Mapped[str | None] = mapped_column(Text, nullable=True)
     title_en: Mapped[str | None] = mapped_column(String(255), nullable=True)

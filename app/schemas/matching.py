@@ -90,7 +90,7 @@ class ApprenantOut(BaseModel):
     lastname: str
     email: str
     phone: str | None
-    created_at: datetime
+    created_at: datetime | None
 
     class Config:
         from_attributes = True

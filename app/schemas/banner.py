@@ -6,6 +6,9 @@ from pydantic import BaseModel, field_validator
 class BannerCreate(BaseModel):
     ordre: int
     image_url: str
+    # Variante mobile optionnelle, saisie manuellement par l'admin : si vide,
+    # le site retombe sur image_url pour toutes les tailles d'ecran.
+    image_url_mobile: str | None = None
 
     @field_validator("ordre")
     @classmethod
@@ -23,6 +26,7 @@ class BannerOut(BaseModel):
     id: int
     ordre: int
     image_url: str
+    image_url_mobile: str | None
     is_active: bool
     updated_at: datetime
 

@@ -25,6 +25,9 @@ def get_prestataire_reviews(prestataire_id: int, db: Session = Depends(get_db)):
         .order_by(Review.created_at.desc())
         .all()
     )
+    # Le client peut avoir ete supprime du marketplace Trankyl depuis
+    # (compte ferme) : on ignore ces avis orphelins plutot que de planter
+    # l'affichage.
     reviews = [
         ReviewOut(
             id=r.id,
@@ -35,6 +38,7 @@ def get_prestataire_reviews(prestataire_id: int, db: Session = Depends(get_db)):
             client_firstname=r.client.firstname,
         )
         for r in rows
+        if r.client is not None
     ]
     average = round(sum(r.rating for r in rows) / len(rows), 1) if rows else None
     return ReviewSummaryOut(average_rating=average, review_count=len(rows), reviews=reviews)

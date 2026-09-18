@@ -1,25 +1,21 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 
 class ContactRequest(Base):
-    """Demande d'un client pour contacter un prestataire. Passe par une
-    validation admin avant que la messagerie ne s'ouvre entre les deux :
-    client -> demande (pending) -> admin approuve/rejette -> si approuve,
-    un fil de discussion (ContactMessage) s'ouvre entre le client et le
-    prestataire. Un seul enregistrement par paire client/prestataire :
-    reutilise pour les echanges suivants une fois approuve."""
+    """Demande d'un client pour contacter un prestataire, moderee par un
+    admin. Table `academy_contact_requests` (base partagee Trankyl)."""
 
-    __tablename__ = "contact_requests"
-    __table_args__ = (UniqueConstraint("client_id", "prestataire_id", name="uq_contact_request_client_prestataire"),)
+    __tablename__ = "academy_contact_requests"
+    __table_args__ = (UniqueConstraint("client_id", "vendor_id", name="uq_academy_contact_request_client_vendor"),)
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
-    prestataire_id: Mapped[int] = mapped_column(ForeignKey("apprenants.id", ondelete="CASCADE"), nullable=False)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    client_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("clients.client_id", ondelete="CASCADE"), nullable=False)
+    prestataire_id: Mapped[int] = mapped_column("vendor_id", BigInteger, ForeignKey("vendors.vendor_id", ondelete="CASCADE"), nullable=False)
     initial_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending | approved | rejected
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -33,13 +29,13 @@ class ContactRequest(Base):
 
 
 class ContactMessage(Base):
-    """Un message dans un fil client<->prestataire, actif seulement une fois
-    le ContactRequest approuve par l'admin."""
+    """Un message dans un fil client<->prestataire. Table
+    `academy_contact_messages`."""
 
-    __tablename__ = "contact_messages"
+    __tablename__ = "academy_contact_messages"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    contact_request_id: Mapped[int] = mapped_column(ForeignKey("contact_requests.id", ondelete="CASCADE"), nullable=False)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    contact_request_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("academy_contact_requests.id", ondelete="CASCADE"), nullable=False)
     sender_role: Mapped[str] = mapped_column(String(20), nullable=False)  # client | prestataire
     content: Mapped[str] = mapped_column(Text, nullable=False)
     read: Mapped[bool] = mapped_column(Boolean, default=False)

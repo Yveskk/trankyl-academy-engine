@@ -1,38 +1,39 @@
-from datetime import date, datetime
+from datetime import date
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, Date, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 
 class Metier(Base):
-    """Un metier du referentiel (ex: nounou, aide a domicile, cuisinier)."""
+    """Un metier du referentiel (ex: babysitting, cuisine, nettoyage). Table
+    `academy_metiers` (base partagee Trankyl) : chaque ligne reutilise
+    directement l'id d'une sous-categorie de service reelle de Trankyl
+    (`sub_categories.subcat_id`), puisque c'est elle qui relie deja les
+    prestataires via `services.s_subcat_id`."""
 
-    __tablename__ = "metiers"
+    __tablename__ = "academy_metiers"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    code: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    code: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     nom: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Traduction anglaise, saisie manuellement par l'admin. Optionnelle : le
-    # site retombe sur le francais (nom/description) si vide.
     nom_en: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description_en: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     niveaux: Mapped[list["Niveau"]] = relationship(back_populates="metier", cascade="all, delete-orphan", order_by="Niveau.numero")
 
 
 class Niveau(Base):
-    """Un niveau de competence pour un metier donne (1 = bases, 2 = intermediaire, ...)."""
+    """Un niveau de competence pour un metier donne. Table `academy_niveaux`."""
 
-    __tablename__ = "niveaux"
-    __table_args__ = (UniqueConstraint("metier_id", "numero", name="uq_niveau_metier_numero"),)
+    __tablename__ = "academy_niveaux"
+    __table_args__ = (UniqueConstraint("metier_id", "numero", name="uq_academy_niveau_metier_numero"),)
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    metier_id: Mapped[int] = mapped_column(ForeignKey("metiers.id", ondelete="CASCADE"), nullable=False)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    metier_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("academy_metiers.id", ondelete="CASCADE"), nullable=False)
     numero: Mapped[int] = mapped_column(Integer, nullable=False)
     nom: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -49,14 +50,14 @@ class Niveau(Base):
 
 
 class Competence(Base):
-    """Une competence concrete a l'interieur d'un niveau (ex: hygiene et
-    lavage des mains). Se traduit ensuite en un ou plusieurs modules."""
+    """Une competence concrete a l'interieur d'un niveau. Table
+    `academy_competences`."""
 
-    __tablename__ = "competences"
+    __tablename__ = "academy_competences"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    niveau_id: Mapped[int] = mapped_column(ForeignKey("niveaux.id", ondelete="CASCADE"), nullable=False)
-    code: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    niveau_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("academy_niveaux.id", ondelete="CASCADE"), nullable=False)
+    code: Mapped[str] = mapped_column(String(150), unique=True, index=True, nullable=False)
     titre: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     titre_en: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -64,4 +65,4 @@ class Competence(Base):
     ordre: Mapped[int] = mapped_column(Integer, default=0)
 
     niveau: Mapped["Niveau"] = relationship(back_populates="competences")
-    modules: Mapped[list["Module"]] = relationship(back_populates="competence", cascade="all, delete-orphan", order_by="Module.ordre")
+    modules: Mapped[list["Module"]] = relationship(back_populates="competence", cascade="all, delete-orphan", order_by="Module.ordre")  # type: ignore[name-defined]

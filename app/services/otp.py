@@ -74,7 +74,7 @@ def verify_otp(db: Session, email: str, role: str, code: str) -> str:
             OtpCode.identifier == email,
             OtpCode.role == role,
             OtpCode.purpose == "password_reset",
-            OtpCode.used_at.is_(None),
+            OtpCode.used.is_(False),
         )
         .order_by(OtpCode.created_at.desc())
         .first()
@@ -88,7 +88,7 @@ def verify_otp(db: Session, email: str, role: str, code: str) -> str:
         db.commit()
         raise ValueError("Code incorrect")
 
-    otp.used_at = datetime.utcnow()
+    otp.used = True
 
     reset_token = secrets.token_hex(32)
     db.add(
@@ -112,7 +112,7 @@ def reset_password(db: Session, email: str, role: str, reset_token: str, new_pas
             OtpCode.role == role,
             OtpCode.purpose == "reset_token",
             OtpCode.code == reset_token,
-            OtpCode.used_at.is_(None),
+            OtpCode.used.is_(False),
         )
         .first()
     )
@@ -124,5 +124,5 @@ def reset_password(db: Session, email: str, role: str, reset_token: str, new_pas
         raise ValueError("Compte introuvable")
 
     account.hashed_password = hash_password(new_password)
-    token_row.used_at = datetime.utcnow()
+    token_row.used = True
     db.commit()

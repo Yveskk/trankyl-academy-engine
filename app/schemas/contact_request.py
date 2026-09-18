@@ -23,7 +23,7 @@ class ContactRequestAdminOut(ContactRequestOut):
     client_nom: str
     client_email: str
     client_phone: str | None
-    client_created_at: datetime
+    client_created_at: datetime | None
     client_total_requests: int
 
     prestataire_nom: str
@@ -32,7 +32,7 @@ class ContactRequestAdminOut(ContactRequestOut):
     prestataire_is_verified: bool
     prestataire_trust_score: float | None
     prestataire_certifications: list[str]
-    prestataire_created_at: datetime
+    prestataire_created_at: datetime | None
 
     message_count: int
     last_message_at: datetime | None

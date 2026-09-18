@@ -48,7 +48,7 @@ def create_banner(payload: BannerCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail=f"Une banniere existe deja pour l'emplacement {payload.ordre}")
 
-    banner = Banner(ordre=payload.ordre, image_url=payload.image_url)
+    banner = Banner(ordre=payload.ordre, image_url=payload.image_url, image_url_mobile=payload.image_url_mobile)
     db.add(banner)
     db.commit()
     db.refresh(banner)
@@ -66,6 +66,7 @@ def update_banner(banner_id: int, payload: BannerUpdate, db: Session = Depends(g
 
     banner.ordre = payload.ordre
     banner.image_url = payload.image_url
+    banner.image_url_mobile = payload.image_url_mobile
     banner.is_active = payload.is_active
     db.commit()
     db.refresh(banner)

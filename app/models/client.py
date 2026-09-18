@@ -1,6 +1,4 @@
-from datetime import datetime
-
-from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy import BigInteger, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -8,18 +6,40 @@ from app.db.base import Base
 
 class Client(Base):
     """Un foyer/particulier qui cherche un prestataire via l'assistant SITA
-    (/matching/chat) — distinct des apprenants (qui suivent une formation
-    pour DEVENIR prestataire). Table separee : ce ne sont pas les memes
-    personnes ni le meme parcours, meme si les deux pourront un jour se
-    rejoindre via un vendor_id Trankyl commun."""
+    (/matching/chat). Stocke dans la table `clients` de la base partagee
+    du Trankyl Marketplace — c'est la meme table que celle utilisee par
+    l'app Trankyl elle-meme (7000+ lignes existantes).
+
+    Comme pour `Apprenant`/`vendors`, `clients` n'a qu'un champ
+    `client_name` (nom complet) : `firstname`/`lastname` decoupent ce champ
+    par propriete Python. Cette table n'a par ailleurs aucune colonne de
+    date de creation (`created_at` n'existe pas cote Trankyl) : la
+    propriete correspondante renvoie toujours None plutot que d'inventer
+    une donnee qui n'existe pas."""
 
     __tablename__ = "clients"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    firstname: Mapped[str] = mapped_column(String(255), nullable=False)
-    lastname: Mapped[str] = mapped_column(String(255), nullable=False)
-    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    id: Mapped[int] = mapped_column("client_id", BigInteger, primary_key=True)
+    client_unique_id: Mapped[str] = mapped_column(String(25), nullable=False)
+    client_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column("client_email", String(255), nullable=False)
+    hashed_password: Mapped[str | None] = mapped_column("client_password", String(255), nullable=True)
+    phone: Mapped[str | None] = mapped_column("client_phone", String(50), nullable=True)
+    is_active_raw: Mapped[int | None] = mapped_column("client_is_active", nullable=True)
+
+    @property
+    def firstname(self) -> str:
+        return (self.client_name or "").split(" ", 1)[0]
+
+    @property
+    def lastname(self) -> str:
+        parts = (self.client_name or "").split(" ", 1)
+        return parts[1] if len(parts) > 1 else ""
+
+    @property
+    def is_active(self) -> bool:
+        return bool(self.is_active_raw)
+
+    @property
+    def created_at(self) -> None:
+        return None

@@ -20,7 +20,7 @@ class ApprenantOut(BaseModel):
     lastname: str
     email: EmailStr
     phone: str | None
-    created_at: datetime
+    created_at: datetime | None
 
     class Config:
         from_attributes = True
@@ -40,7 +40,7 @@ class ClientOut(BaseModel):
     lastname: str
     email: EmailStr
     phone: str | None
-    created_at: datetime
+    created_at: datetime | None
 
     class Config:
         from_attributes = True

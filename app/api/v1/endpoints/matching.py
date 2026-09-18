@@ -482,8 +482,16 @@ def unread_count(
 
 @router.get("/admin/apprenants", response_model=list[ApprenantDetailOut], dependencies=[Depends(get_current_admin)])
 def list_apprenants(db: Session = Depends(get_db)):
-    """Liste tous les apprenants avec leurs certifications et progressions."""
-    apprenants = db.query(Apprenant).order_by(Apprenant.created_at.desc()).all()
+    """Liste tous les apprenants avec leurs certifications et progressions.
+    Filtre sur `academy_status` : la table `vendors` est partagee avec tout
+    le marketplace Trankyl (5000+ lignes), seuls les vendors passes par
+    l'Academy (apprentis ou certifies) doivent apparaitre ici."""
+    apprenants = (
+        db.query(Apprenant)
+        .filter(Apprenant.academy_status.isnot(None))
+        .order_by(Apprenant.created_at.desc())
+        .all()
+    )
     result = []
     for a in apprenants:
         certs = db.query(Certification).filter(Certification.apprenant_id == a.id).all()

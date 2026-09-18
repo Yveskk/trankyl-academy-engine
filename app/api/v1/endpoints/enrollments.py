@@ -84,6 +84,9 @@ def list_niveau_enrollments(db: Session = Depends(get_db)):
         .order_by(NiveauEnrollment.created_at.desc())
         .all()
     )
+    # Le vendor lie a l'inscription peut avoir ete supprime du marketplace
+    # Trankyl independamment de l'Academy (compte ferme) : on ignore ces
+    # lignes orphelines plutot que de planter l'affichage admin.
     return [
         NiveauEnrollmentAdminOut(
             id=r.id,
@@ -100,6 +103,7 @@ def list_niveau_enrollments(db: Session = Depends(get_db)):
             created_at=r.created_at,
         )
         for r in rows
+        if r.apprenant is not None
     ]
 
 
