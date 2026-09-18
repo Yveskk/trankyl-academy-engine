@@ -10,8 +10,10 @@ from app.api.v1.endpoints import (
     curriculum,
     enrollments,
     matching,
+    orientation,
     quizzes,
     reviews,
+    stats,
     taxonomy,
 )
 
@@ -28,3 +30,5 @@ api_router.include_router(blog.router, prefix="/blog", tags=["blog"])
 api_router.include_router(banners.router, prefix="/banners", tags=["banners"])
 api_router.include_router(reviews.router, prefix="/reviews", tags=["reviews"])
 api_router.include_router(contact_requests.router, prefix="/contact-requests", tags=["contact-requests"])
+api_router.include_router(stats.router, prefix="/stats", tags=["stats"])
+api_router.include_router(orientation.router, prefix="/orientation", tags=["orientation"])

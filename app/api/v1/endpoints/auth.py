@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin, get_current_apprenant, get_current_client
 from app.core.ids import generate_unique_id
+from app.core.phone import phone_lookup_variants
 from app.core.rate_limit import limiter
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
@@ -18,6 +19,7 @@ from app.schemas.auth import (
     ClientRegister,
     ForgotPasswordRequest,
     LoginRequest,
+    PhoneLoginRequest,
     ResetPasswordRequest,
     Token,
     VerifyOtpRequest,
@@ -53,10 +55,10 @@ def register(request: Request, payload: ApprenantRegister, db: Session = Depends
 
 @router.post("/login", response_model=Token)
 @limiter.limit("10/minute")
-def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)):
-    apprenant = db.query(Apprenant).filter(Apprenant.email == payload.email).first()
+def login(request: Request, payload: PhoneLoginRequest, db: Session = Depends(get_db)):
+    apprenant = db.query(Apprenant).filter(Apprenant.phone.in_(phone_lookup_variants(payload.phone))).first()
     if not apprenant or not verify_password(payload.password, apprenant.hashed_password):
-        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
+        raise HTTPException(status_code=401, detail="Telephone ou mot de passe incorrect")
     token = create_access_token(subject=str(apprenant.id), role="apprenant")
     return Token(access_token=token)
 
@@ -90,10 +92,10 @@ def register_client(request: Request, payload: ClientRegister, db: Session = Dep
 
 @router.post("/client/login", response_model=Token)
 @limiter.limit("10/minute")
-def login_client(request: Request, payload: LoginRequest, db: Session = Depends(get_db)):
-    client = db.query(Client).filter(Client.email == payload.email).first()
+def login_client(request: Request, payload: PhoneLoginRequest, db: Session = Depends(get_db)):
+    client = db.query(Client).filter(Client.phone.in_(phone_lookup_variants(payload.phone))).first()
     if not client or not verify_password(payload.password, client.hashed_password):
-        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
+        raise HTTPException(status_code=401, detail="Telephone ou mot de passe incorrect")
     token = create_access_token(subject=str(client.id), role="client")
     return Token(access_token=token)
 

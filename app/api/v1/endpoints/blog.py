@@ -1,5 +1,7 @@
-"""Articles de blog, geres depuis l'admin. is_active permet de depublier un
-article sans le supprimer, meme logique que la taxonomie/ContentSection."""
+"""Articles de blog = evenements reels Trankyl (table partagee `events`,
+voir app.models.blog). is_active permet de depublier un article sans le
+supprimer — mais rappel : supprimer/depublier ici affecte la meme ligne que
+le site principal Trankyl consulte."""
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
@@ -14,23 +16,19 @@ router = APIRouter()
 
 
 def _to_detail(article: BlogArticle) -> BlogArticleDetailOut:
+    content = article.content.split("\n\n") if article.content else []
     return BlogArticleDetailOut(
         id=article.id,
-        slug=article.slug,
         title=article.title,
         excerpt=article.excerpt,
         category=article.category,
-        title_en=article.title_en,
-        excerpt_en=article.excerpt_en,
-        category_en=article.category_en,
-        read_time=article.read_time,
-        cover=article.cover,
         cover_image_url=article.cover_image_url,
-        published_at=article.published_at,
+        event_start_date=article.event_start_date,
+        event_end_date=article.event_end_date,
         is_active=article.is_active,
+        published_at=article.published_at,
         updated_at=article.updated_at,
-        content=article.content.split("\n\n"),
-        content_en=article.content_en.split("\n\n") if article.content_en else None,
+        content=content,
     )
 
 
@@ -49,18 +47,18 @@ async def upload_cover_image(request: Request, file: UploadFile = File(...)):
 
 @router.get("/articles", response_model=list[BlogArticleOut])
 def list_articles(db: Session = Depends(get_db)):
-    """Liste publique : uniquement les articles actifs, plus recents d'abord."""
+    """Liste publique : uniquement les evenements actifs, plus recents d'abord."""
     return (
         db.query(BlogArticle)
         .filter(BlogArticle.is_active.is_(True))
-        .order_by(BlogArticle.published_at.desc())
+        .order_by(BlogArticle.created_at.desc())
         .all()
     )
 
 
-@router.get("/articles/{slug}", response_model=BlogArticleDetailOut)
-def get_article(slug: str, db: Session = Depends(get_db)):
-    article = db.query(BlogArticle).filter(BlogArticle.slug == slug, BlogArticle.is_active.is_(True)).first()
+@router.get("/articles/{article_id}", response_model=BlogArticleDetailOut)
+def get_article(article_id: int, db: Session = Depends(get_db)):
+    article = db.query(BlogArticle).filter(BlogArticle.id == article_id, BlogArticle.is_active.is_(True)).first()
     if not article:
         raise HTTPException(status_code=404, detail="Article introuvable")
     return _to_detail(article)
@@ -68,8 +66,8 @@ def get_article(slug: str, db: Session = Depends(get_db)):
 
 @router.get("/admin/articles", response_model=list[BlogArticleOut], dependencies=[Depends(get_current_admin)])
 def admin_list_articles(db: Session = Depends(get_db)):
-    """Liste admin : tous les articles, actifs ou non."""
-    return db.query(BlogArticle).order_by(BlogArticle.published_at.desc()).all()
+    """Liste admin : tous les evenements, actifs ou non."""
+    return db.query(BlogArticle).order_by(BlogArticle.created_at.desc()).all()
 
 
 @router.get(
@@ -84,22 +82,15 @@ def admin_get_article(article_id: int, db: Session = Depends(get_db)):
 
 @router.post("/articles", response_model=BlogArticleDetailOut, status_code=201, dependencies=[Depends(get_current_admin)])
 def create_article(payload: BlogArticleCreate, db: Session = Depends(get_db)):
-    if db.query(BlogArticle).filter(BlogArticle.slug == payload.slug).first():
-        raise HTTPException(status_code=400, detail="Un article existe deja avec ce slug")
     article = BlogArticle(
-        slug=payload.slug,
         title=payload.title,
         excerpt=payload.excerpt,
         category=payload.category,
-        title_en=payload.title_en,
-        excerpt_en=payload.excerpt_en,
-        category_en=payload.category_en,
-        read_time=payload.read_time,
-        cover=payload.cover,
         cover_image_url=payload.cover_image_url,
-        published_at=payload.published_at,
+        event_start_date=payload.event_start_date,
+        event_end_date=payload.event_end_date,
         content="\n\n".join(payload.content),
-        content_en="\n\n".join(payload.content_en) if payload.content_en else None,
+        is_active=True,
     )
     db.add(article)
     db.commit()
@@ -114,23 +105,14 @@ def update_article(article_id: int, payload: BlogArticleUpdate, db: Session = De
     article = db.get(BlogArticle, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article introuvable")
-    existing_slug = db.query(BlogArticle).filter(BlogArticle.slug == payload.slug, BlogArticle.id != article_id).first()
-    if existing_slug:
-        raise HTTPException(status_code=400, detail="Un autre article utilise deja ce slug")
 
-    article.slug = payload.slug
     article.title = payload.title
     article.excerpt = payload.excerpt
     article.category = payload.category
-    article.title_en = payload.title_en
-    article.excerpt_en = payload.excerpt_en
-    article.category_en = payload.category_en
-    article.read_time = payload.read_time
-    article.cover = payload.cover
     article.cover_image_url = payload.cover_image_url
-    article.published_at = payload.published_at
+    article.event_start_date = payload.event_start_date
+    article.event_end_date = payload.event_end_date
     article.content = "\n\n".join(payload.content)
-    article.content_en = "\n\n".join(payload.content_en) if payload.content_en else None
     article.is_active = payload.is_active
     db.commit()
     db.refresh(article)

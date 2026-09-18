@@ -1,46 +1,36 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 
-class BlogArticleBase(BaseModel):
-    slug: str
+class BlogArticleCreate(BaseModel):
     title: str
     excerpt: str
-    category: str
-    # Traduction anglaise, saisie manuellement par l'admin : optionnelle,
-    # repli sur le francais si vide.
-    title_en: str | None = None
-    excerpt_en: str | None = None
-    category_en: str | None = None
-    read_time: str = "3 min"
-    cover: str = "green"
+    category: str | None = None
     cover_image_url: str | None = None
-    published_at: date
-
-    @field_validator("cover")
-    @classmethod
-    def validate_cover(cls, v: str) -> str:
-        if v not in ("green", "gold"):
-            raise ValueError('cover doit etre "green" ou "gold"')
-        return v
-
-
-class BlogArticleCreate(BlogArticleBase):
+    event_start_date: date | None = None
+    event_end_date: date | None = None
     content: list[str]
-    content_en: list[str] | None = None
 
 
-class BlogArticleUpdate(BlogArticleBase):
-    content: list[str]
-    content_en: list[str] | None = None
+class BlogArticleUpdate(BlogArticleCreate):
     is_active: bool = True
 
 
-class BlogArticleOut(BlogArticleBase):
+class BlogArticleOut(BaseModel):
     id: int
-    is_active: bool
-    updated_at: datetime
+    # nullable cote base (table `events`, partagee avec le marketplace
+    # Trankyl) : une ligne creee ailleurs pourrait ne pas avoir tous les
+    # champs remplis.
+    title: str | None
+    excerpt: str | None
+    category: str | None
+    cover_image_url: str | None
+    event_start_date: date | None
+    event_end_date: date | None
+    is_active: bool | None
+    published_at: date | None
+    updated_at: datetime | None
 
     class Config:
         from_attributes = True
@@ -48,4 +38,3 @@ class BlogArticleOut(BlogArticleBase):
 
 class BlogArticleDetailOut(BlogArticleOut):
     content: list[str]
-    content_en: list[str] | None = None

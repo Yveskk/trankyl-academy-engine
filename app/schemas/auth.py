@@ -11,7 +11,7 @@ class ApprenantRegister(BaseModel):
     lastname: str
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
-    phone: str | None = None
+    phone: str
 
 
 class ApprenantOut(BaseModel):
@@ -31,7 +31,7 @@ class ClientRegister(BaseModel):
     lastname: str
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
-    phone: str | None = None
+    phone: str
 
 
 class ClientOut(BaseModel):
@@ -54,7 +54,7 @@ class AdminLogin(BaseModel):
 class AdminOut(BaseModel):
     id: int
     firstname: str
-    lastname: str
+    lastname: str | None
     email: EmailStr
 
     class Config:
@@ -62,7 +62,16 @@ class AdminOut(BaseModel):
 
 
 class LoginRequest(BaseModel):
+    """Reserve a la connexion admin (email + mot de passe)."""
+
     email: EmailStr
+    password: str
+
+
+class PhoneLoginRequest(BaseModel):
+    """Connexion apprenant/client : telephone + mot de passe."""
+
+    phone: str
     password: str
 
 

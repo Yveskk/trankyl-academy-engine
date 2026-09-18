@@ -24,6 +24,7 @@ from app.models.matching import Message
 from app.models.progress import Enrollment
 from app.models.taxonomy import Competence, Metier, Niveau
 from app.models.user import Apprenant
+from app.services.metier_keywords import detect_metier_code
 
 # Client Gemini — clé depuis GEMINI_API_KEY ou None
 _client = None
@@ -131,7 +132,8 @@ def build_context(db: Session) -> str:
 
 
 SYSTEM_PROMPT = """Tu t'appelles SITA, l'assistant intelligent de Trankyl Academy, une plateforme de
-micro-certification pour les metiers du quotidien (nounou, aide a domicile, cuisinier, agent d'entretien).
+micro-certification pour les metiers du quotidien (babysitting, aide aux travaux domestiques, cuisine,
+nettoyage maison/bureau/vehicules/piscine/meubles/jardin, courses/shopping).
 Si on te demande ton nom, reponds que tu es SITA.
 
 Ton role est d'aider les clients a trouver le bon prestataire en fonction de leurs besoins.
@@ -145,7 +147,10 @@ Pour chaque demande client :
 - Analyse le besoin precise (type de metier, nombre d'enfants/personnes, frequence, etc.)
 - Identifie les certifications pertinentes dans la taxonomie
 - Propose les prestataires dont les certifications correspondent
-- Explique POURQUOI chaque prestataire est pertinent (quelles competences il a)
+- Explique POURQUOI chaque prestataire est pertinent (quel metier/quelles competences il a)
+- Ne mentionne JAMAIS de numero de niveau precis a un client (ex: "niveau 2") — ce detail
+  n'interesse pas quelqu'un qui cherche un prestataire. Mentionne plutot le metier/domaine
+  et, si utile, le nombre total de certifications obtenues (ex: "3 certifications")
 - Si aucun prestataire ne correspond parfaitement, suggere les plus proches
 - Si le client semble etre lui-meme un futur prestataire, oriente-le vers les modules de formation
 
@@ -155,7 +160,7 @@ Formate ta reponse de maniere lisible avec des emojis pertinents.
 IMPORTANT : Pour les liens, utilise le format bouton interactif :
 [btn:Texte du bouton:url]
 Exemple : [btn:Voir le profil:/prestataires/2]
-Exemple : [btn:Explorer la formation:/metiers/nounou]
+Exemple : [btn:Explorer la formation:/metiers/babysitting]
 
 Si tu identifies un besoin de formation, cree un bouton vers /metiers/[code].
 Si un prestataire correspond, cree un bouton vers /prestataires/[id] pour le contacter.
@@ -203,21 +208,7 @@ def chat_with_ai(user_message: str, db: Session, conversation_history: list[dict
 
 def _local_matching_response(user_message: str, db: Session) -> str:
     """Reponse de fallback sans cle API Gemini — matching par mots-cles."""
-    msg_lower = user_message.lower()
-
-    # Detection du metier
-    metier_keywords = {
-        "nounou": ["enfant", "bebe", "nounou", "garde", "babysitting", "petit"],
-        "aide-domicile": ["personne agee", "domicile", "aide", "dependant", "ainé"],
-        "cuisinier": ["cuisine", "repas", "cuisinier", "chef", "plat"],
-        "agent-entretien": ["menage", "nettoyage", "entretien", "proprete", "agent"],
-    }
-
-    detected_metier = None
-    for code, keywords in metier_keywords.items():
-        if any(kw in msg_lower for kw in keywords):
-            detected_metier = code
-            break
+    detected_metier = detect_metier_code(user_message)
 
     # Reponse
     lines = ["🤖 **SITA — Assistant Trankyl Academy**\n"]
@@ -248,7 +239,8 @@ def _local_matching_response(user_message: str, db: Session) -> str:
             if prestataires_found:
                 lines.append(f"✅ **{len(prestataires_found)} prestataire(s) certifie(s)** disponible(s) :\n")
                 for p in prestataires_found.values():
-                    lines.append(f"- 👤 **{p['nom']}** — Certifications : {', '.join(p['certs'])}")
+                    count = len(p["certs"])
+                    lines.append(f"- 👤 **{p['nom']}** — {count} certification{'s' if count > 1 else ''} obtenue{'s' if count > 1 else ''}")
                     lines.append(f"  [btn:Voir le profil:/prestataires/{p['id']}]")
             else:
                 lines.append("❌ Aucun prestataire certifie n'est disponible pour le moment.")
@@ -256,8 +248,8 @@ def _local_matching_response(user_message: str, db: Session) -> str:
     else:
         lines.append("Je peux vous aider a trouver le bon prestataire !\n")
         lines.append("Dites-moi simplement ou cliquez sur un bouton :\n")
-        lines.append("  [btn:👶 Nounou:/prestataires?pref=nounou]  [btn:🏠 Aide domicile:/prestataires?pref=aide-domicile]")
-        lines.append("  [btn:🍳 Cuisinier:/prestataires?pref=cuisinier]  [btn:🧹 Entretien:/prestataires?pref=agent-entretien]")
+        lines.append("  [btn:👶 Babysitting:/metiers/babysitting]  [btn:🍳 Cuisine:/metiers/cuisine]")
+        lines.append("  [btn:🧹 Nettoyage maison:/metiers/nettoyage-maison]  [btn:🔧 Travaux domestiques:/metiers/aide-travaux-domestiques]")
         lines.append("\nOu decrivez votre besoin en details !")
 
     return "\n".join(lines)

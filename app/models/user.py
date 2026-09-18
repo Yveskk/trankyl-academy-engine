@@ -33,6 +33,8 @@ class Apprenant(Base):
     phone: Mapped[str | None] = mapped_column("vendor_phone", String(50), nullable=True)
     is_active_raw: Mapped[str | None] = mapped_column("vendor_is_active", String(10), nullable=True)
     created_at: Mapped[datetime | None] = mapped_column("vendor_created_at", DateTime, nullable=True)
+    sex: Mapped[str | None] = mapped_column("vendor_sex", String(10), nullable=True)
+    address_city: Mapped[str | None] = mapped_column("vendor_address_city", String(255), nullable=True)
 
     academy_status: Mapped[str | None] = mapped_column("vendor_academy_status", String(20), nullable=True)
     is_verified: Mapped[bool] = mapped_column("vendor_academy_verified", Boolean, default=False)
@@ -58,17 +60,23 @@ class Apprenant(Base):
 
 
 class AdminUser(Base):
-    """Compte administrateur du site Academy : gere la taxonomie et le
-    curriculum. Table dediee `academy_admin_users` (base partagee) —
-    distincte de `users`/`admin` cote Trankyl marketplace, qui suivent
-    leur propre systeme de permissions sans rapport avec l'Academy."""
+    """Compte administrateur du site Academy = compte staff Trankyl. Table
+    `users` (base partagee) : pas de table admin dediee a l'Academy, on
+    reutilise directement les comptes du staff Trankyl. `us_user_type_id`
+    vaut 1 pour le type "Admin" (permissions `["ADMIN"]` dans
+    `user_types`) — les roles plus restreints (graphiste, service client)
+    n'ont pas acces au panneau Academy, qui n'a pas de permissions
+    granulaires comme le panneau Trankyl."""
 
-    __tablename__ = "academy_admin_users"
+    __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    firstname: Mapped[str] = mapped_column(String(255), nullable=False)
-    lastname: Mapped[str] = mapped_column(String(255), nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    id: Mapped[int] = mapped_column("us_id", BigInteger, primary_key=True)
+    email: Mapped[str] = mapped_column("email", String(255), nullable=False)
+    hashed_password: Mapped[str] = mapped_column("password", String(255), nullable=False)
+    firstname: Mapped[str] = mapped_column("us_firstname", String(255), nullable=False)
+    lastname: Mapped[str | None] = mapped_column("us_lastname", String(255), nullable=True)
+    user_type_id: Mapped[int | None] = mapped_column("us_user_type_id", BigInteger, nullable=True)
+
+    @property
+    def is_active(self) -> bool:
+        return self.user_type_id == 1

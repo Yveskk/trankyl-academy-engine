@@ -28,16 +28,18 @@ from app.services.ai_matching import _get_client
 # --- Composante "regles" (somme des poids = 1.0) --------------------------
 RULES_WEIGHTS = {
     # part des niveaux inscrits (niveau_enrollments) effectivement certifies
-    "certifications": 0.30,
+    # — critere dominant : une certification delivree par Academy est le
+    # signal le plus fort qu'on ait sur un prestataire.
+    "certifications": 0.60,
     # moyenne des scores obtenus aux tentatives de quiz (0-100 -> 0-1)
-    "quiz_quality": 0.20,
+    "quiz_quality": 0.12,
     # part des modules commences qui ont ete termines
-    "completion_rate": 0.10,
+    "completion_rate": 0.04,
     # compte verifie manuellement par un admin (identite / serieux) : 0 ou 1
-    "account_verified": 0.15,
+    "account_verified": 0.09,
     # moyenne des avis clients (1-5 etoiles -> 0-100%) — 0% si aucun avis,
     # on ne fabrique jamais un signal positif a partir de l'absence de donnee
-    "client_reviews": 0.25,
+    "client_reviews": 0.15,
 }
 assert abs(sum(RULES_WEIGHTS.values()) - 1.0) < 1e-9, "RULES_WEIGHTS doit sommer a 1.0"
 
@@ -52,7 +54,7 @@ assert abs(RULES_WEIGHT_WITH_REFERENCES + LLM_WEIGHT_WITH_REFERENCES - 1.0) < 1e
 # les suggestions de SITA. Choisi pour exclure les profils sans aucun track
 # record verifiable (score "regles seules" tres bas) sans etre punitif pour
 # un profil recent mais deja verifie et avec de bons quiz.
-TRUST_SCORE_THRESHOLD = 50.0
+TRUST_SCORE_THRESHOLD = 30.0
 
 
 def _rules_component(db: Session, apprenant: Apprenant) -> tuple[float, dict]:
