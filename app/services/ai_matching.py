@@ -5,6 +5,7 @@ des prestataires pertinents.
 import json
 import os
 import sys
+import time
 
 # Le paquet `brotli` installe sur ce serveur (Brotli 1.1.0, via apt) expose une
 # API (`.process()`) incompatible avec ce qu'attendent certains decodeurs
@@ -45,6 +46,32 @@ def _get_client():
         print(f"[ai_matching] Erreur init Gemini: {e}")
         _client = None
         return None
+
+
+def generate_with_retry(client, contents, system_instruction: str, max_output_tokens: int = 2048, attempts: int = 3, delay_seconds: float = 1.5) -> str:
+    """Appelle Gemini avec quelques tentatives avant d'abandonner : le modele
+    renvoie frequemment des erreurs 503 "high demand" transitoires qui
+    passent en general des le 2e ou 3e essai quelques secondes plus tard —
+    partage entre SITA (matching) et SITA (orientation formation)."""
+    from google.genai import types
+
+    last_error: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    max_output_tokens=max_output_tokens,
+                ),
+            )
+            return response.text
+        except Exception as e:
+            last_error = e
+            if attempt < attempts - 1:
+                time.sleep(delay_seconds)
+    raise last_error
 
 
 def build_context(db: Session) -> str:
@@ -189,15 +216,7 @@ def chat_with_ai(user_message: str, db: Session, conversation_history: list[dict
                 contents.append(types.Content(role=role, parts=[types.Part(text=m["content"])]))
             contents.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
 
-            response = client.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=system,
-                    max_output_tokens=2048,
-                ),
-            )
-            return response.text
+            return generate_with_retry(client, contents, system)
         except Exception as e:
             print(f"[ai_matching] Erreur Gemini API: {e}")
             return _local_matching_response(user_message, db)

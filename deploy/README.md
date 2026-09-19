@@ -26,7 +26,7 @@ développement local.
 ### 1. Build & push de l'image (en local)
 
 ```bash
-./deploy/deploy-service.sh 0.1.0 --push
+./deploy/deploy-service.sh 0.2.1 --push
 ```
 
 ### 2. DNS
