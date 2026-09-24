@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin, get_current_apprenant, get_current_client
 from app.core.ids import generate_unique_id
-from app.core.phone import phone_lookup_variants
+from app.core.phone import normalize_phone_for_storage, phone_lookup_variants
 from app.core.rate_limit import limiter
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
@@ -41,7 +41,7 @@ def register(request: Request, payload: ApprenantRegister, db: Session = Depends
         vendor_unique_id=generate_unique_id("VEN"),
         vendor_name=f"{payload.firstname} {payload.lastname}".strip(),
         email=payload.email,
-        phone=payload.phone,
+        phone=normalize_phone_for_storage(payload.phone),
         hashed_password=hash_password(payload.password),
         academy_status="apprentice",
         is_active_raw="1",
@@ -80,7 +80,7 @@ def register_client(request: Request, payload: ClientRegister, db: Session = Dep
         client_unique_id=generate_unique_id("CLI"),
         client_name=f"{payload.firstname} {payload.lastname}".strip(),
         email=payload.email,
-        phone=payload.phone,
+        phone=normalize_phone_for_storage(payload.phone),
         hashed_password=hash_password(payload.password),
         is_active_raw=1,
     )

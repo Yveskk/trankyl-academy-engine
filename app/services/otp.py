@@ -90,7 +90,12 @@ def verify_otp(db: Session, email: str, role: str, code: str) -> str:
 
     otp.used = True
 
-    reset_token = secrets.token_hex(32)
+    # 5 octets = 10 caracteres hex : tient exactement dans `code`
+    # (varchar(10), partage avec les OTP a 6 chiffres) — un token plus long
+    # serait tronque silencieusement par MySQL a l'insertion, tout en etant
+    # retourne en entier par l'API, ce qui rendrait la comparaison au moment
+    # du reset-password impossible a faire correspondre.
+    reset_token = secrets.token_hex(5)
     db.add(
         OtpCode(
             identifier=email,

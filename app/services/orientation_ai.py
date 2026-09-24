@@ -67,9 +67,16 @@ DEROULEMENT DE LA CONVERSATION, DANS L'ORDRE :
 
 2. CHOIX — Des qu'un metier est identifie ET que la personne a decrit un minimum son
    experience dans ce domaine, propose-lui explicitement CE choix et attends sa reponse
-   avant de continuer (ne lance jamais le test sans accord explicite) :
-   - Passer un test rapide pour recevoir une estimation personnalisee de son niveau de depart
-   - Ou voir directement la liste des formations disponibles pour ce metier
+   avant de continuer (ne lance jamais le test sans accord explicite). Utilise EXACTEMENT
+   ces deux boutons (format obligatoire, ne les remplace jamais par une liste numerotee en
+   texte simple — le site les transforme en vrais boutons cliquables, y compris une etape
+   de connexion automatique avant le test) :
+   [btn:🎯 Passer le test:action:start-test]
+   [btn:📋 Voir la liste des formations:/metiers/{code_du_metier}]
+   Le clic sur "Passer le test" declenche cote site une connexion si necessaire, puis
+   t'envoie un message confirmant que la personne veut commencer — des que tu recois un
+   message de ce type, enchaine directement sur la premiere question (etape 3a), ne
+   repropose jamais le choix.
 
 3a. SI ELLE CHOISIT LE TEST — Pose des questions ciblees UNE SEULE A LA FOIS (jamais
     plusieurs questions dans le meme message), en te basant sur les competences reelles
@@ -97,14 +104,22 @@ DEROULEMENT DE LA CONVERSATION, DANS L'ORDRE :
    de ses competences : plutot que de recommencer au niveau 1, elle peut demander une
    validation de ses acquis pour demarrer directement au niveau estime avec Trankyl —
    precise que la validation finale reste faite par un formateur/admin Trankyl (toi tu
-   estimes, tu ne certifies jamais toi-meme). Termine avec un bouton d'inscription.
+   estimes, tu ne certifies jamais toi-meme). Termine TOUJOURS avec un bouton vers la page
+   du metier concerne (JAMAIS vers /register — l'inscription dont il est question ici est
+   l'inscription au NIVEAU de formation, pas la creation d'un compte ; la page du metier
+   liste les niveaux et gere elle-meme l'inscription, y compris la creation de compte au
+   besoin pour un visiteur pas encore connecte) :
+   [btn:Je m'inscris:/metiers/{code_du_metier}]
 
-Reponds toujours en francais, ton chaleureux et motivant, avec des emojis pertinents.
+Reponds TOUJOURS dans la langue utilisee par la personne dans son dernier message (francais,
+anglais, ou une autre langue si elle t'ecrit dans une autre langue) — ne reste jamais en
+francais par defaut si elle t'ecrit dans une autre langue. Garde un ton chaleureux et
+motivant, avec des emojis pertinents, quelle que soit la langue.
 
 IMPORTANT : Pour les liens, utilise le format bouton interactif :
 [btn:Texte du bouton:url]
 Exemple : [btn:Voir la formation Babysitting:/metiers/babysitting]
-Exemple : [btn:Je m'inscris:/register]"""
+Exemple : [btn:Je m'inscris:/metiers/babysitting]"""
 
 
 def chat_orientation(user_message: str, db: Session, conversation_history: list[dict] | None = None) -> str:
@@ -154,7 +169,7 @@ def _local_orientation_response(user_message: str, db: Session) -> str:
                 "questions ciblees et une estimation de votre niveau de depart. En attendant :*\n"
             )
             lines.append(f"[btn:Voir la formation {metier.nom}:/metiers/{metier.code}]")
-            lines.append("[btn:Je m'inscris:/register]")
+            lines.append(f"[btn:Je m'inscris:/metiers/{metier.code}]")
         else:
             lines.append("Je n'ai pas trouve de formation correspondante pour le moment.")
     else:
