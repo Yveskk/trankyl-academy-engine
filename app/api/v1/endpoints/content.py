@@ -5,19 +5,25 @@ meme si elle existe toujours en base (juste masquee, pas supprimee)."""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_admin
+from app.api.deps import current_country, require_access
 from app.db.session import get_db
 from app.models.content import ContentSection
+from app.services.home import invalidate_home_cache
 from app.schemas.content import ContentSectionOut, ContentSectionUpsert
 
 router = APIRouter()
 
 
 @router.get("/sections/{key}", response_model=ContentSectionOut)
-def get_public_section(key: str, db: Session = Depends(get_db)):
+def get_public_section(key: str, country: str = Depends(current_country), db: Session = Depends(get_db)):
     """Lecture publique : 404 si la section n'existe pas OU si elle est
-    desactivee, pour que le site n'ait qu'un seul cas a gerer ("pas la")."""
-    section = db.query(ContentSection).filter(ContentSection.key == key, ContentSection.is_active.is_(True)).first()
+    desactivee, pour que le site n'ait qu'un seul cas a gerer ("pas la").
+    Le contenu du pays demande, a defaut celui du pays de reference (TG)."""
+    section = None
+    for code in (country, "TG"):
+        section = db.query(ContentSection).filter(ContentSection.key == key, ContentSection.country_code == code, ContentSection.is_active.is_(True)).first()
+        if section:
+            break
     if not section:
         raise HTTPException(status_code=404, detail="Section introuvable ou desactivee")
     return section
@@ -26,12 +32,11 @@ def get_public_section(key: str, db: Session = Depends(get_db)):
 @router.get(
     "/admin/sections/{key}",
     response_model=ContentSectionOut,
-    dependencies=[Depends(get_current_admin)],
 )
-def get_admin_section(key: str, db: Session = Depends(get_db)):
-    """Lecture admin : renvoie la section meme si desactivee, pour pre-remplir
+def get_admin_section(key: str, admin=Depends(require_access("content")), db: Session = Depends(get_db)):
+    """Lecture admin : renvoie la section (du pays courant) meme si desactivee, pour pre-remplir
     le formulaire d'edition."""
-    section = db.query(ContentSection).filter(ContentSection.key == key).first()
+    section = db.query(ContentSection).filter(ContentSection.key == key, ContentSection.country_code == admin.country).first()
     if not section:
         raise HTTPException(status_code=404, detail="Section introuvable")
     return section
@@ -40,11 +45,10 @@ def get_admin_section(key: str, db: Session = Depends(get_db)):
 @router.put(
     "/admin/sections/{key}",
     response_model=ContentSectionOut,
-    dependencies=[Depends(get_current_admin)],
 )
-def upsert_section(key: str, payload: ContentSectionUpsert, db: Session = Depends(get_db)):
-    """Cree ou met a jour la section (une seule par cle)."""
-    section = db.query(ContentSection).filter(ContentSection.key == key).first()
+def upsert_section(key: str, payload: ContentSectionUpsert, admin=Depends(require_access("content")), db: Session = Depends(get_db)):
+    """Cree ou met a jour la section (une seule par cle et par pays)."""
+    section = db.query(ContentSection).filter(ContentSection.key == key, ContentSection.country_code == admin.country).first()
     if section:
         section.title = payload.title
         section.subtitle = payload.subtitle
@@ -54,6 +58,7 @@ def upsert_section(key: str, payload: ContentSectionUpsert, db: Session = Depend
     else:
         section = ContentSection(
             key=key,
+            country_code=admin.country,
             title=payload.title,
             subtitle=payload.subtitle,
             title_en=payload.title_en,
@@ -63,4 +68,5 @@ def upsert_section(key: str, payload: ContentSectionUpsert, db: Session = Depend
         db.add(section)
     db.commit()
     db.refresh(section)
+    invalidate_home_cache()
     return section

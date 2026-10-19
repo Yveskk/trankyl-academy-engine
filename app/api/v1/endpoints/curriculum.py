@@ -1,13 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import get_current_admin
+from app.api.deps import require_access
 from app.db.session import get_db
 from app.models.curriculum import Module, Quiz, QuizChoice, QuizQuestion
 from app.models.taxonomy import Competence
 from app.schemas.curriculum import ModuleCreate, ModuleOut, ModuleUpdate, QuizCreate, QuizOut
 
 router = APIRouter()
+
+
+def _module_country(module: Module) -> str:
+    return module.competence.niveau.metier.country_code
+
+
+def _own_module(db: Session, module_id: int, country: str) -> Module:
+    """Un module n'est visible / modifiable que dans le pays de son metier."""
+    module = db.get(Module, module_id)
+    if not module or _module_country(module) != country:
+        raise HTTPException(status_code=404, detail="Module introuvable")
+    return module
 
 
 # --- Lecture publique ---
@@ -45,10 +57,10 @@ def get_module_quiz(module_id: int, db: Session = Depends(get_db)):
 # --- Ecriture reservee aux admins ---
 
 
-@router.post("/modules", response_model=ModuleOut, status_code=201, dependencies=[Depends(get_current_admin)])
-def create_module(payload: ModuleCreate, db: Session = Depends(get_db)):
+@router.post("/modules", response_model=ModuleOut, status_code=201)
+def create_module(payload: ModuleCreate, admin=Depends(require_access("curriculum")), db: Session = Depends(get_db)):
     competence = db.get(Competence, payload.competence_id)
-    if not competence:
+    if not competence or competence.niveau.metier.country_code != admin.country:
         raise HTTPException(status_code=404, detail="Competence introuvable")
     if db.query(Module).filter(Module.code == payload.code).first():
         raise HTTPException(status_code=400, detail="Ce code module existe deja")
@@ -59,11 +71,9 @@ def create_module(payload: ModuleCreate, db: Session = Depends(get_db)):
     return module
 
 
-@router.post("/quizzes", response_model=QuizOut, status_code=201, dependencies=[Depends(get_current_admin)])
-def create_quiz(payload: QuizCreate, db: Session = Depends(get_db)):
-    module = db.get(Module, payload.module_id)
-    if not module:
-        raise HTTPException(status_code=404, detail="Module introuvable")
+@router.post("/quizzes", response_model=QuizOut, status_code=201)
+def create_quiz(payload: QuizCreate, admin=Depends(require_access("curriculum")), db: Session = Depends(get_db)):
+    module = _own_module(db, payload.module_id, admin.country)
     if module.quiz is not None:
         raise HTTPException(status_code=400, detail="Ce module a deja un quiz")
 
@@ -80,11 +90,9 @@ def create_quiz(payload: QuizCreate, db: Session = Depends(get_db)):
     return quiz
 
 
-@router.put("/modules/{module_id}", response_model=ModuleOut, dependencies=[Depends(get_current_admin)])
-def update_module(module_id: int, payload: ModuleUpdate, db: Session = Depends(get_db)):
-    module = db.get(Module, module_id)
-    if not module:
-        raise HTTPException(status_code=404, detail="Module introuvable")
+@router.put("/modules/{module_id}", response_model=ModuleOut)
+def update_module(module_id: int, payload: ModuleUpdate, admin=Depends(require_access("curriculum")), db: Session = Depends(get_db)):
+    module = _own_module(db, module_id, admin.country)
     existing_code = db.query(Module).filter(Module.code == payload.code, Module.id != module_id).first()
     if existing_code:
         raise HTTPException(status_code=400, detail="Ce code module existe deja")
@@ -100,10 +108,8 @@ def update_module(module_id: int, payload: ModuleUpdate, db: Session = Depends(g
     return module
 
 
-@router.delete("/modules/{module_id}", status_code=204, dependencies=[Depends(get_current_admin)])
-def delete_module(module_id: int, db: Session = Depends(get_db)):
-    module = db.get(Module, module_id)
-    if not module:
-        raise HTTPException(status_code=404, detail="Module introuvable")
+@router.delete("/modules/{module_id}", status_code=204)
+def delete_module(module_id: int, admin=Depends(require_access("curriculum")), db: Session = Depends(get_db)):
+    module = _own_module(db, module_id, admin.country)
     db.delete(module)
     db.commit()

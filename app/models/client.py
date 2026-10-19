@@ -26,6 +26,9 @@ class Client(Base):
     hashed_password: Mapped[str | None] = mapped_column("client_password", String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column("client_phone", String(50), nullable=True)
     is_active_raw: Mapped[int | None] = mapped_column("client_is_active", nullable=True)
+    image: Mapped[str | None] = mapped_column("client_image", String(500), nullable=True)
+    country_id: Mapped[int | None] = mapped_column("client_country_id", BigInteger, nullable=True)
+    country_code: Mapped[str | None] = mapped_column("client_country_code", String(10), nullable=True)
 
     @property
     def firstname(self) -> str:

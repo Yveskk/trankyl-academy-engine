@@ -7,9 +7,11 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
+from sqlalchemy import text
+from app.services.countries import provider_in_country as vendor_in_country, provider_offer_clause as vendor_country_clause
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import get_current_admin, get_current_client, get_current_client_or_apprenant
+from app.api.deps import get_current_client, get_current_client_or_apprenant, require_access
 from app.db.session import get_db
 from app.models.certification import Certification
 from app.models.client import Client
@@ -187,10 +189,12 @@ def _build_admin_out(db: Session, req: ContactRequest) -> ContactRequestAdminOut
     )
 
 
-@router.get("/admin", response_model=list[ContactRequestAdminOut], dependencies=[Depends(get_current_admin)])
-def admin_list_contact_requests(db: Session = Depends(get_db)):
+@router.get("/admin", response_model=list[ContactRequestAdminOut])
+def admin_list_contact_requests(admin=Depends(require_access("contacts")), db: Session = Depends(get_db)):
+    clause, cparams = vendor_country_clause(db, admin.country, "v")
     rows = (
         db.query(ContactRequest)
+        .filter(text(f"academy_contact_requests.vendor_id IN (SELECT v.vendor_id FROM vendors v WHERE {clause})").bindparams(**cparams))
         .options(
             joinedload(ContactRequest.client),
             joinedload(ContactRequest.prestataire),
@@ -205,12 +209,10 @@ def admin_list_contact_requests(db: Session = Depends(get_db)):
     return [_build_admin_out(db, r) for r in rows if r.client is not None and r.prestataire is not None]
 
 
-@router.patch(
-    "/{request_id}/review", response_model=ContactRequestAdminOut, dependencies=[Depends(get_current_admin)]
-)
-def review_contact_request(request_id: int, payload: ContactRequestReview, db: Session = Depends(get_db)):
+@router.patch("/{request_id}/review", response_model=ContactRequestAdminOut)
+def review_contact_request(request_id: int, payload: ContactRequestReview, admin=Depends(require_access("contacts")), db: Session = Depends(get_db)):
     req = db.get(ContactRequest, request_id)
-    if not req:
+    if not req or not vendor_in_country(db, req.prestataire_id, admin.country):
         raise HTTPException(status_code=404, detail="Demande introuvable")
     req.status = payload.status
     req.reviewed_at = datetime.utcnow()

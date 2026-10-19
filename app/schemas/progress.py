@@ -38,7 +38,7 @@ class NiveauEnrollmentAdminOut(BaseModel):
     id: int
     apprenant_id: int
     apprenant_nom: str
-    apprenant_email: str
+    apprenant_email: str | None = None
     niveau_id: int
     niveau_nom: str
     niveau_numero: int

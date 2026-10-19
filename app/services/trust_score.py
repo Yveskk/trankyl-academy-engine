@@ -117,7 +117,7 @@ def _rules_component(db: Session, apprenant: Apprenant) -> tuple[float, dict]:
     }
 
     # 5. Moyenne des avis clients (1-5 etoiles)
-    ratings = [r[0] for r in db.query(Review.rating).filter(Review.prestataire_id == apprenant.id).all()]
+    ratings = [r[0] for r in db.query(Review.rating).filter(Review.prestataire_id == apprenant.id, Review.status == "approved").all()]
     reviews_ratio = ((sum(ratings) / len(ratings)) / 5.0) if ratings else 0.0
     breakdown["client_reviews"] = {
         "label": "Moyenne des avis clients",

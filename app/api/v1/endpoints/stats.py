@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
+from app.api.deps import current_country
 from app.db.session import get_db
+from app.services.countries import vendor_country_clause
 from app.models.certification import Certification
 from app.models.progress import Enrollment
 from app.models.taxonomy import Metier, Niveau
@@ -18,8 +20,11 @@ router = APIRouter()
 
 
 @router.get("/public", response_model=PublicImpactStats)
-def public_impact_stats(db: Session = Depends(get_db)):
-    total_apprenants = db.query(Apprenant).filter(Apprenant.academy_status.isnot(None)).count()
+def public_impact_stats(country: str = Depends(current_country), db: Session = Depends(get_db)):
+    """Chiffres d'impact DU PAYS demande (`?country=` / `X-Country`)."""
+    clause, cparams = vendor_country_clause(db, country, "vendors")
+    cf = lambda: text(clause).bindparams(**cparams)  # noqa: E731 - nouveau fragment a chaque requete
+    total_apprenants = db.query(Apprenant).filter(Apprenant.academy_status.isnot(None), cf()).count()
 
     # `bookings` appartient au marketplace Trankyl (pas de modele SQLAlchemy
     # dedie ici) : nombre de reservations reelles non annulees honorees par
@@ -30,21 +35,23 @@ def public_impact_stats(db: Session = Depends(get_db)):
         text(
             "SELECT COUNT(*) FROM bookings b JOIN vendors v ON b.bk_vendor_id = v.vendor_id "
             "WHERE v.vendor_academy_status = 'certified_provider' "
+            f"AND {clause.replace('vendors.', 'v.')} "
             "AND (b.bk_service_status IS NULL OR b.bk_service_status NOT IN ('3','4'))"
-        )
+        ),
+        cparams,
     ).scalar()
 
     total_certifications = (
-        db.query(func.count(Certification.id)).join(Apprenant, Certification.apprenant_id == Apprenant.id).scalar()
+        db.query(func.count(Certification.id)).join(Apprenant, Certification.apprenant_id == Apprenant.id).filter(cf()).scalar()
     )
 
     started = (
-        db.query(func.count(Enrollment.id)).join(Apprenant, Enrollment.apprenant_id == Apprenant.id).scalar()
+        db.query(func.count(Enrollment.id)).join(Apprenant, Enrollment.apprenant_id == Apprenant.id).filter(cf()).scalar()
     )
     completed = (
         db.query(func.count(Enrollment.id))
         .join(Apprenant, Enrollment.apprenant_id == Apprenant.id)
-        .filter(Enrollment.statut == "termine")
+        .filter(Enrollment.statut == "termine", cf())
         .scalar()
     )
     taux_completion_moyen_pct = round((completed / started) * 100, 1) if started else None
@@ -55,6 +62,7 @@ def public_impact_stats(db: Session = Depends(get_db)):
         .join(Apprenant, Certification.apprenant_id == Apprenant.id)
         .join(Niveau, Certification.niveau_id == Niveau.id)
         .join(Metier, Niveau.metier_id == Metier.id)
+        .filter(cf())
         .group_by(Metier.id, Niveau.numero)
         .order_by(Metier.nom, Niveau.numero)
         .all()
@@ -70,6 +78,7 @@ def public_impact_stats(db: Session = Depends(get_db)):
         .join(Apprenant, Certification.apprenant_id == Apprenant.id)
         .join(Niveau, Certification.niveau_id == Niveau.id)
         .join(Metier, Niveau.metier_id == Metier.id)
+        .filter(cf())
         .group_by(Metier.id)
         .order_by(func.count(func.distinct(Apprenant.id)).desc())
         .all()
@@ -80,18 +89,18 @@ def public_impact_stats(db: Session = Depends(get_db)):
     ]
 
     profils_verifies = (
-        db.query(Apprenant).filter(Apprenant.academy_status.isnot(None), Apprenant.is_verified.is_(True)).count()
+        db.query(Apprenant).filter(Apprenant.academy_status.isnot(None), Apprenant.is_verified.is_(True), cf()).count()
     )
 
     score_confiance_moyen = (
-        db.query(func.avg(TrustScore.score_pct)).join(Apprenant, TrustScore.apprenant_id == Apprenant.id).scalar()
+        db.query(func.avg(TrustScore.score_pct)).join(Apprenant, TrustScore.apprenant_id == Apprenant.id).filter(cf()).scalar()
     )
     score_confiance_moyen = round(float(score_confiance_moyen), 1) if score_confiance_moyen is not None else None
 
-    total_certifies = db.query(Apprenant).filter(Apprenant.academy_status == "certified_provider").count()
+    total_certifies = db.query(Apprenant).filter(Apprenant.academy_status == "certified_provider", cf()).count()
     non_verifies_certifies = (
         db.query(Apprenant)
-        .filter(Apprenant.academy_status == "certified_provider", Apprenant.is_verified.is_(False))
+        .filter(Apprenant.academy_status == "certified_provider", Apprenant.is_verified.is_(False), cf())
         .count()
     )
     pct_profils_bloques_verification = (
@@ -100,13 +109,13 @@ def public_impact_stats(db: Session = Depends(get_db)):
 
     nombre_villes = (
         db.query(func.count(func.distinct(Apprenant.address_city)))
-        .filter(Apprenant.academy_status.isnot(None), Apprenant.address_city.isnot(None), Apprenant.address_city != "")
+        .filter(Apprenant.academy_status.isnot(None), Apprenant.address_city.isnot(None), Apprenant.address_city != "", cf())
         .scalar()
     )
 
     genre_rows = (
         db.query(Apprenant.sex, func.count(Apprenant.id))
-        .filter(Apprenant.academy_status.isnot(None), Apprenant.sex.isnot(None), Apprenant.sex != "")
+        .filter(Apprenant.academy_status.isnot(None), Apprenant.sex.isnot(None), Apprenant.sex != "", cf())
         .group_by(Apprenant.sex)
         .all()
     )

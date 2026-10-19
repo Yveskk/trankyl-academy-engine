@@ -16,7 +16,8 @@ class Metier(Base):
     __tablename__ = "academy_metiers"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    code: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(100), index=True, nullable=False)  # unique par pays (migration 0010)
+    country_code: Mapped[str] = mapped_column(String(2), nullable=False, default="TG", server_default="TG")
     nom: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     nom_en: Mapped[str | None] = mapped_column(String(255), nullable=True)

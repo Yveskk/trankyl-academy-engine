@@ -27,9 +27,14 @@ def verify_password(plain_password: str, hashed_password: str | None) -> bool:
         return False
 
 
-def create_access_token(subject: str, role: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload = {"sub": subject, "role": role, "exp": expire}
+def create_access_token(subject: str, role: str, amr: list[str] | None = None, expires_minutes: int | None = None) -> str:
+    """`amr` : methodes d'authentification utilisees (ex. ["pwd", "otp"]) — permet de
+    savoir si la session a ete protegee par un code."""
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(minutes=expires_minutes or settings.access_token_expire_minutes)
+    payload = {"sub": subject, "role": role, "exp": expire, "iat": now}
+    if amr:
+        payload["amr"] = amr
     return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
 
 

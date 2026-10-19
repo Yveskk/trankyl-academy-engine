@@ -27,7 +27,7 @@ class ContactRequestAdminOut(ContactRequestOut):
     client_total_requests: int
 
     prestataire_nom: str
-    prestataire_email: str
+    prestataire_email: str | None = None
     prestataire_phone: str | None
     prestataire_is_verified: bool
     prestataire_trust_score: float | None

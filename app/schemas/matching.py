@@ -23,7 +23,7 @@ class PrestataireMatchOut(BaseModel):
     id: int
     firstname: str
     lastname: str
-    email: str
+    email: str | None = None
     certifications: list[str] = []
     score: int = 0
     trust_score: float | None = None
@@ -88,7 +88,7 @@ class ApprenantOut(BaseModel):
     id: int
     firstname: str
     lastname: str
-    email: str
+    email: str | None = None
     phone: str | None
     created_at: datetime | None
 
@@ -101,6 +101,7 @@ class ApprenantDetailOut(ApprenantOut):
     enrollment_count: int = 0
     completed_count: int = 0
     is_verified: bool = False
+    academy_status: str | None = None  # apprentice | provider | certified_provider
     trust_score: float | None = None
 
 

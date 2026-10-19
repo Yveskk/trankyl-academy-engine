@@ -4,9 +4,11 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import func
+from sqlalchemy import text
+from app.services.countries import vendor_country_clause, vendor_in_country
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import get_current_admin, get_current_apprenant, get_current_client, get_optional_admin
+from app.api.deps import current_country, get_current_apprenant, get_current_client, get_optional_admin, require_access
 from app.core.rate_limit import limiter
 from app.db.session import get_db
 from app.models.certification import Certification
@@ -54,10 +56,11 @@ class ChatRequest(BaseModel):
 def create_matching_request(
     payload: MatchingRequestCreate,
     current: Client = Depends(get_current_client),
+    country: str = Depends(current_country),
     db: Session = Depends(get_db),
 ):
-    """Le client crée une demande de recherche de prestataire pour un metier."""
-    metier = db.query(Metier).filter(Metier.code == payload.metier_code).first()
+    """Le client crée une demande de recherche de prestataire pour un metier du pays courant."""
+    metier = db.query(Metier).filter(Metier.code == payload.metier_code, Metier.country_code == country).first()
     if not metier:
         raise HTTPException(status_code=404, detail="Metier introuvable")
     req = MatchingRequest(client_id=current.id, metier_code=payload.metier_code, description=payload.description)
@@ -66,7 +69,7 @@ def create_matching_request(
     db.refresh(req)
 
     # Lancer le matching automatiquement
-    _compute_matches(db, req)
+    _compute_matches(db, req, country)
     return req
 
 
@@ -181,14 +184,11 @@ def get_trust_score(
     )
 
 
-@router.patch(
-    "/admin/apprenants/{apprenant_id}/verification",
-    response_model=TrustScoreOut,
-    dependencies=[Depends(get_current_admin)],
-)
+@router.patch("/admin/apprenants/{apprenant_id}/verification", response_model=TrustScoreOut)
 def update_verification(
     apprenant_id: int,
     payload: VerificationUpdate,
+    admin=Depends(require_access("learners")),
     db: Session = Depends(get_db),
 ):
     """Verification manuelle d'un apprenant par un admin (identite / serieux)
@@ -197,7 +197,7 @@ def update_verification(
     demontrable en direct (verifie -> apparait dans le matching / non
     verifie -> disparait)."""
     apprenant = db.get(Apprenant, apprenant_id)
-    if not apprenant:
+    if not apprenant or not vendor_in_country(db, apprenant_id, admin.country):
         raise HTTPException(status_code=404, detail="Apprenant introuvable")
 
     if payload.is_verified is not None:
@@ -229,11 +229,12 @@ def update_verification(
 def chat(
     request: Request,
     payload: ChatRequest,
+    country: str = Depends(current_country),
     db: Session = Depends(get_db),
 ):
-    """Chat intelligent avec SITA (Gemini) — matching IA base sur les donnees DB."""
+    """Chat intelligent avec SITA (Gemini) — matching IA base sur les donnees DB du pays courant."""
     try:
-        response = chat_with_ai(payload.message, db, payload.history)
+        response = chat_with_ai(payload.message, db, payload.history, country)
         return {"response": response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur SITA: {str(e)}")
@@ -278,6 +279,7 @@ def send_chat_message(
     session_id: int,
     payload: ChatRequest,
     current: Client = Depends(get_current_client),
+    country: str = Depends(current_country),
     db: Session = Depends(get_db),
 ):
     """Envoie un message dans une session et retourne la reponse IA avec boutons."""
@@ -301,7 +303,7 @@ def send_chat_message(
 
     # Appel IA
     try:
-        response = chat_with_ai(payload.message, db, history[:-1])
+        response = chat_with_ai(payload.message, db, history[:-1], country)
     except Exception as e:
         response = f"❌ Erreur: {str(e)}"
 
@@ -333,13 +335,13 @@ def delete_chat_session(
     db.commit()
 
 
-def _compute_matches(db: Session, request: MatchingRequest) -> None:
+def _compute_matches(db: Session, request: MatchingRequest, country: str | None = None) -> None:
     """Algorithme de matching : calcule un score 0-100 pour chaque prestataire certifie."""
     # Trouver les certifications pertinentes pour le metier
     niveaux = (
         db.query(Niveau)
         .join(Metier)
-        .filter(Metier.code == request.metier_code)
+        .filter(Metier.code == request.metier_code, *([Metier.country_code == country] if country else []))
         .all()
     )
     niveau_ids = {n.id for n in niveaux}
@@ -480,15 +482,17 @@ def unread_count(
 # ADMIN : GESTION DES APPRENANTS
 # ====================================================================
 
-@router.get("/admin/apprenants", response_model=list[ApprenantDetailOut], dependencies=[Depends(get_current_admin)])
-def list_apprenants(db: Session = Depends(get_db)):
+@router.get("/admin/apprenants", response_model=list[ApprenantDetailOut])
+def list_apprenants(admin=Depends(require_access("learners")), db: Session = Depends(get_db)):
     """Liste tous les apprenants avec leurs certifications et progressions.
     Filtre sur `academy_status` : la table `vendors` est partagee avec tout
     le marketplace Trankyl (5000+ lignes), seuls les vendors passes par
     l'Academy (apprentis ou certifies) doivent apparaitre ici."""
+    clause, cparams = vendor_country_clause(db, admin.country, "vendors")
     apprenants = (
         db.query(Apprenant)
         .filter(Apprenant.academy_status.isnot(None))
+        .filter(text(clause).bindparams(**cparams))
         .order_by(Apprenant.created_at.desc())
         .all()
     )
@@ -513,6 +517,7 @@ def list_apprenants(db: Session = Depends(get_db)):
             enrollment_count=enrollment_count,
             completed_count=completed_count,
             is_verified=a.is_verified,
+            academy_status=a.academy_status,
             trust_score=trust.score_pct if trust else None,
         ))
     return result

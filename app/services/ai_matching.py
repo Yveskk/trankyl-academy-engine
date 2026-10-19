@@ -74,10 +74,10 @@ def generate_with_retry(client, contents, system_instruction: str, max_output_to
     raise last_error
 
 
-def build_context(db: Session) -> str:
-    """Construit le contexte de la base de donnees pour SITA."""
+def build_context(db: Session, country: str | None = None) -> str:
+    """Construit le contexte de la base de donnees pour SITA (limite aux metiers du pays si precise)."""
     # --- Metiers & Taxonomie ---
-    metiers = db.query(Metier).all()
+    metiers = db.query(Metier).filter(Metier.country_code == country).all() if country else db.query(Metier).all()
     taxonomie = []
     for m in metiers:
         niveaux = db.query(Niveau).filter(Niveau.metier_id == m.id).order_by(Niveau.numero).all()
@@ -98,7 +98,7 @@ def build_context(db: Session) -> str:
         })
 
     # --- Modules ---
-    modules = db.query(Module).all()
+    modules = [m for m in db.query(Module).all() if not country or m.competence.niveau.metier.country_code == country]
     modules_data = []
     for mod in modules:
         competence = db.get(Competence, mod.competence_id)
@@ -197,10 +197,10 @@ Si un prestataire correspond, cree un bouton vers /prestataires/[id] pour le con
 Propose toujours des boutons cliquables pour guider l'utilisateur."""
 
 
-def chat_with_ai(user_message: str, db: Session, conversation_history: list[dict] | None = None) -> str:
+def chat_with_ai(user_message: str, db: Session, conversation_history: list[dict] | None = None, country: str | None = None) -> str:
     """Envoie un message a Gemini avec le contexte de la base de donnees."""
     client = _get_client()
-    context = build_context(db)
+    context = build_context(db, country)
 
     system = f"""{SYSTEM_PROMPT}
 
@@ -222,13 +222,13 @@ def chat_with_ai(user_message: str, db: Session, conversation_history: list[dict
             return generate_with_retry(client, contents, system)
         except Exception as e:
             print(f"[ai_matching] Erreur Gemini API: {e}")
-            return _local_matching_response(user_message, db)
+            return _local_matching_response(user_message, db, country)
     else:
         # Mode degradé sans clé API — reponse analytique locale
-        return _local_matching_response(user_message, db)
+        return _local_matching_response(user_message, db, country)
 
 
-def _local_matching_response(user_message: str, db: Session) -> str:
+def _local_matching_response(user_message: str, db: Session, country: str | None = None) -> str:
     """Reponse de fallback sans cle API Gemini — matching par mots-cles."""
     detected_metier = detect_metier_code(user_message)
 
@@ -236,7 +236,8 @@ def _local_matching_response(user_message: str, db: Session) -> str:
     lines = ["🤖 **SITA — Assistant Trankyl Academy**\n"]
 
     if detected_metier:
-        metier = db.query(Metier).filter(Metier.code == detected_metier).first()
+        mq = db.query(Metier).filter(Metier.code == detected_metier)
+        metier = (mq.filter(Metier.country_code == country) if country else mq).first()
         if metier:
             lines.append(f"J'ai detecte que vous cherchez un **{metier.nom}** !\n")
             lines.append(f"📝 *{metier.description}*\n")

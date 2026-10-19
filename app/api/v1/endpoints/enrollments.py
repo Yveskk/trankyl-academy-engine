@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import get_current_admin, get_current_apprenant
+from app.services.countries import vendors_in_country
+from app.api.deps import get_current_apprenant, require_access
 from app.db.session import get_db
 from app.models.curriculum import Module
 from app.models.progress import Enrollment, NiveauEnrollment
@@ -68,12 +69,8 @@ def my_niveau_enrollments(current: Apprenant = Depends(get_current_apprenant), d
     ]
 
 
-@router.get(
-    "/niveaux",
-    response_model=list[NiveauEnrollmentAdminOut],
-    dependencies=[Depends(get_current_admin)],
-)
-def list_niveau_enrollments(db: Session = Depends(get_db)):
+@router.get("/niveaux", response_model=list[NiveauEnrollmentAdminOut])
+def list_niveau_enrollments(admin=Depends(require_access("enrollments")), db: Session = Depends(get_db)):
     """Liste des inscriptions a des niveaux, pour l'admin."""
     rows = (
         db.query(NiveauEnrollment)
@@ -84,6 +81,8 @@ def list_niveau_enrollments(db: Session = Depends(get_db)):
         .order_by(NiveauEnrollment.created_at.desc())
         .all()
     )
+    in_country = vendors_in_country(db, [r.apprenant_id for r in rows], admin.country)
+    rows = [r for r in rows if r.apprenant_id in in_country]  # inscriptions des apprenants du pays courant
     # Le vendor lie a l'inscription peut avoir ete supprime du marketplace
     # Trankyl independamment de l'Academy (compte ferme) : on ignore ces
     # lignes orphelines plutot que de planter l'affichage admin.

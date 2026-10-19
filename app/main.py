@@ -21,7 +21,10 @@ tags_metadata = [
     {"name": "quizzes", "description": "Soumission des tentatives de quiz, corrigees automatiquement."},
     {"name": "certifications", "description": "Certifications obtenues par l'apprenant connecte."},
     {"name": "blog", "description": "Articles de blog. Lecture publique, ecriture admin."},
-    {"name": "banners", "description": "Images de la banniere d'accueil (max 3). Lecture publique, ecriture admin."},
+    {"name": "configuration", "description": "Configuration du site (admin) : pays de la bande verte, etc."},
+    {"name": "directory", "description": "Annuaire public : recherche de prestataires, localites, profil public."},
+    {"name": "home", "description": "Page d'accueil : lecture agregee publique (cache) et configuration admin."},
+    {"name": "providers", "description": "Profil enrichi des prestataires (admin) : assurance, mise en avant, realisations, disponibilites."},
     {"name": "reviews", "description": "Avis clients sur les prestataires. Lecture publique, ecriture client connecte."},
     {"name": "contact-requests", "description": "Mise en relation client<->prestataire, moderee par l'admin."},
 ]
@@ -46,6 +49,16 @@ app.add_middleware(
 )
 
 app.state.limiter = limiter
+
+
+@app.on_event("startup")
+def _warm_caches() -> None:
+    from app.services.home import warm_home_cache
+
+    warm_home_cache()
+    from app.services.account_deletion import start_scheduler
+
+    start_scheduler()
 
 
 @app.exception_handler(RateLimitExceeded)
